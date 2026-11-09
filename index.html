@@ -1,5 +1,4 @@
-with open("index.html", "w", encoding="utf-8") as f:
-    f.write("""<!DOCTYPE html>
+html_code = r"""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -667,6 +666,11 @@ with open("index.html", "w", encoding="utf-8") as f:
 
         // ================= 분석 탭 =================
         function calculateScore() {
+            // 잔액 체크 (전체 기간 기준)
+            const totalIncomeAll = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+            const totalExpenseAll = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+            const currentBalance = totalIncomeAll - totalExpenseAll;
+
             const currentTxs = getCurrentMonthTransactions();
             const expenseTxs = currentTxs.filter(t => t.type === 'expense');
             const totalExpense = expenseTxs.reduce((sum, t) => sum + t.amount, 0);
@@ -681,10 +685,15 @@ with open("index.html", "w", encoding="utf-8") as f:
             let feedback = []; 
             let grade = ""; let color = "";
 
+            if (currentBalance < 0) {
+                score -= 40; 
+                feedback.push("🚨 현재 남은 전체 잔액이 마이너스예요! 당분간 지출을 멈추고 무조건 돈을 모아야 합니다.");
+            }
+
             // 예산이 0원이면 비교 생략 혹은 조정
             if(allowanceAmount > 0) {
                 if (totalExpense > allowanceAmount * 1.2) {
-                    score -= 30; feedback.push("💸 예산을 크게 초과했어요. 지출 통제가 시급합니다!");
+                    score -= 30; feedback.push("💸 이번 달 예산을 크게 초과했어요. 지출 통제가 시급합니다!");
                 } else if (totalExpense > allowanceAmount) {
                     score -= 20; feedback.push("⚠️ 예산을 조금 초과해서 썼어요. 다음 달엔 꼭 예산 안에서 해결해봐요.");
                 } else if (totalExpense > allowanceAmount * 0.9) {
@@ -701,11 +710,10 @@ with open("index.html", "w", encoding="utf-8") as f:
             } else {
                  if (totalExpense > 0) {
                     feedback.push("⚠️ 설정된 예산(용돈)이 0원인데 지출이 발생했어요. 예산 설정을 확인해주세요.");
-                 } else {
+                 } else if (currentBalance >= 0) {
                     feedback.push("💡 아직 등록된 지출 내역이 없습니다.");
                  }
             }
-
 
             if (totalExpense > 0 && maxCatAmount > totalExpense * 0.5) {
                 if(topCat !== '식비' && topCat !== '교통') { 
@@ -1076,7 +1084,7 @@ with open("index.html", "w", encoding="utf-8") as f:
 
         // ================= 데이터 초기화 =================
         document.getElementById('reset-data-btn').addEventListener('click', () => {
-            if(confirm('정말로 모든 데이터를 지우고 처음부터 다시 시작할까요?\\n(확인을 누르면 모든 내역이 0원으로 초기화됩니다)')) {
+            if(confirm('정말로 모든 데이터를 지우고 처음부터 다시 시작할까요?\n(확인을 누르면 모든 내역이 0원으로 초기화됩니다)')) {
                 localStorage.clear();
                 localStorage.setItem('initialized', 'true'); 
                 location.reload();
@@ -1088,4 +1096,7 @@ with open("index.html", "w", encoding="utf-8") as f:
         updateSelectOptions();
     </script>
 </body>
-</html>""")
+</html>"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(code.strip())
