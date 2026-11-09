@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고등학생 용돈 기입장</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f3f4f6; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .bottom-nav-item.active-text { color: #3b82f6; }
+        .category-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        
+        #chat-messages::-webkit-scrollbar { width: 6px; }
+        #chat-messages::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        
+        /* 홈 중앙 버튼 애니메이션 */
+        .home-fab { box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39); }
+        .home-fab:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="text-gray-800 pb-24">
+
+    <!-- Header -->
+    <header class="bg-white p-4 sticky top-0 z-10 shadow-sm flex justify-between items-center">
+        <button id="logo-home" class="flex items-center gap-2 hover:opacity-80 transition focus:outline-none">
+            <span class="text-2xl">👛</span>
+            <h1 class="text-xl font-extrabold text-gray-800 tracking-tight">내 지갑</h1>
+        </button>
+        <button id="reset-data-btn" class="text-xs text-gray-400 hover:text-red-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100 transition"><i class="fas fa-trash-alt mr-1"></i>데이터 초기화</button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="p-4 max-w-md mx-auto">
+        
+        <!-- ==================== 대시보드 탭 (홈) ==================== -->
+        <section id="tab-dashboard" class="tab-content active space-y-6">
+            <div id="balance-card" class="bg-blue-500 text-white rounded-2xl p-6 shadow-md cursor-pointer transition transform hover:scale-[1.02]">
+                <p class="text-blue-100 text-sm mb-1">현재 남은 돈 <i class="fas fa-chevron-right text-xs ml-1"></i></p>
+                <h2 class="text-3xl font-bold mb-4"><span id="dashboard-balance">0</span>원</h2>
+                <div class="flex justify-between text-sm bg-blue-600 bg-opacity-50 p-3 rounded-lg">
+                    <div>
+                        <p class="text-blue-200 text-xs">이번 달 수입</p>
+                        <p class="font-semibold"><span id="dashboard-income">0</span>원</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-blue-200 text-xs">이번 달 지출</p>
+                        <p class="font-semibold"><span id="dashboard-expense">0</span>원</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex justify-between items-end mb-3">
+                    <h3 class="font-bold text-lg">최근 내역</h3>
+                </div>
+                <div id="recent-transactions" class="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+                    <!-- JS로 채워짐 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 달력 탭 (신설) ==================== -->
+        <section id="tab-calendar" class="tab-content space-y-4">
+            <h2 class="text-2xl font-bold mb-4">소비 달력</h2>
+            <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                <button id="cal-prev" class="text-gray-400 hover:text-blue-500 w-8 h-8 flex justify-center items-center"><i class="fas fa-chevron-left"></i></button>
+                <h2 id="cal-month-title" class="font-bold text-lg text-gray-800">2024년 1월</h2>
+                <button id="cal-next" class="text-gray-400 hover:text-blue-500 w-8 h-8 flex justify-center items-center"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-gray-400 mb-2">
+                    <div class="text-red-400">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-400">토</div>
+                </div>
+                <div id="cal-grid" class="grid grid-cols-7 gap-1">
+                    <!-- JS 렌더링 -->
+                </div>
+            </div>
+
+            <div id="cal-day-details" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hidden">
+                <h3 id="cal-day-title" class="font-bold text-gray-700 mb-3 border-b border-gray-100 pb-2"></h3>
+                <div id="cal-day-list" class="space-y-3"></div>
+            </div>
+        </section>
+
+        <!-- ==================== 내역 추가 탭 ==================== -->
+        <section id="tab-add" class="tab-content">
+            <h2 class="text-2xl font-bold mb-6">내역 추가</h2>
+            <div class="bg-white rounded-2xl p-5 shadow-sm space-y-5">
+                <div class="flex bg-gray-100 rounded-lg p-1">
+                    <button id="type-expense" class="flex-1 py-2 text-sm font-bold rounded-md bg-white shadow text-blue-500 transition-all">지출</button>
+                    <button id="type-income" class="flex-1 py-2 text-sm font-bold rounded-md text-gray-500 transition-all">수입</button>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">날짜</label>
+                    <input type="date" id="add-date" class="w-full border-b border-gray-200 pb-2 outline-none focus:border-blue-500 transition-colors bg-white">
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">금액</label>
+                    <div class="flex items-center border-b border-gray-200 pb-2 focus-within:border-blue-500 transition-colors">
+                        <input type="number" id="add-amount" placeholder="0" class="w-full outline-none text-xl font-bold bg-white">
+                        <span class="text-gray-500 ml-2">원</span>
+                    </div>
+                </div>
+
+                <div id="category-section">
+                    <label class="block text-sm text-gray-500 mb-2">카테고리</label>
+                    <div class="grid grid-cols-4 gap-3 text-center" id="category-grid">
+                        <!-- JS로 렌더링 -->
+                    </div>
+                </div>
+                <input type="hidden" id="add-category">
+
+                <div>
+                    <label class="block text-sm text-gray-500 mb-1">메모 (선택)</label>
+                    <input type="text" id="add-memo" placeholder="어디에 썼나요?" class="w-full border-b border-gray-200 pb-2 outline-none focus:border-blue-500 transition-colors bg-white">
+                </div>
+
+                <button id="btn-save" class="w-full bg-blue-500 text-white font-bold py-4 rounded-xl shadow-md mt-4 hover:bg-blue-600 transition-colors">저장하기</button>
+            </div>
+        </section>
+
+        <!-- ==================== 분석 탭 ==================== -->
+        <section id="tab-analysis" class="tab-content space-y-6">
+            <h2 class="text-2xl font-bold mb-2">소비 분석</h2>
+            
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-lg">나의 소비 점수</h3>
+                    <span id="score-badge" class="px-3 py-1 rounded-full text-xs font-bold text-white bg-blue-500">계산 중</span>
+                </div>
+                <div class="flex items-end gap-2 mb-2">
+                    <span id="score-value" class="text-4xl font-bold text-gray-800">0</span><span class="text-gray-500 pb-1 font-medium">점 / 100점</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden">
+                    <div id="score-bar" class="h-3 rounded-full transition-all duration-1000 ease-out w-0 bg-blue-500"></div>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-xl">
+                    <ul id="score-feedback" class="text-sm text-gray-700 leading-relaxed font-medium space-y-1">
+                        <li>데이터를 분석하고 있습니다...</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex overflow-x-auto gap-2 pb-2 scrollbar-hide text-sm font-medium" id="chart-filters">
+                <button class="filter-btn px-4 py-1.5 rounded-full whitespace-nowrap bg-white text-gray-600 border border-gray-200" data-period="1w">1주일</button>
+                <button class="filter-btn px-4 py-1.5 rounded-full whitespace-nowrap bg-blue-500 text-white shadow-sm" data-period="1m">1개월</button>
+                <button class="filter-btn px-4 py-1.5 rounded-full whitespace-nowrap bg-white text-gray-600 border border-gray-200" data-period="3m">3개월</button>
+                <button class="filter-btn px-4 py-1.5 rounded-full whitespace-nowrap bg-white text-gray-600 border border-gray-200" data-period="6m">6개월</button>
+                <button class="filter-btn px-4 py-1.5 rounded-full whitespace-nowrap bg-white text-gray-600 border border-gray-200" data-period="1y">1년</button>
+                <button class="filter-btn px-4 py-1.5 rounded-full whitespace-nowrap bg-white text-gray-600 border border-gray-200" data-period="all">전체</button>
+            </div>
+
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <h3 class="font-bold mb-4">카테고리별 지출 비율</h3>
+                <div class="relative h-64">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <h3 class="font-bold mb-4">잔액 추이</h3>
+                <div class="relative h-64">
+                    <canvas id="balanceChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-4 shadow-sm mb-6 border border-gray-100">
+                <h3 class="font-bold mb-4">또래 통계 비교 <span class="text-xs text-gray-400 font-normal ml-1">(통계청 KOSIS 기준)</span></h3>
+                <div class="space-y-3">
+                    <div class="bg-blue-50 p-4 rounded-xl">
+                        <p class="text-sm text-blue-800 font-bold mb-2">🥇 내 지출 1위: <span id="my-top1" class="text-blue-600">계산중</span></p>
+                        <p class="text-xs text-gray-700 leading-relaxed">평균 고등학생 지출 1위는 <span class="font-bold text-gray-900">식비·간식(52.1%)</span>이에요. <span id="peer-top1-advice"></span></p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-xl">
+                        <p class="text-sm text-green-800 font-bold mb-2">💰 이번 달 나의 저축률: <span id="my-save-rate" class="text-green-600">계산중</span></p>
+                        <p class="text-xs text-gray-700 leading-relaxed">청소년 평균 월 저축률은 <span class="font-bold text-gray-900">약 11.2%</span>랍니다. <span id="peer-save-advice"></span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 설정 탭 ==================== -->
+        <section id="tab-settings" class="tab-content space-y-4">
+            <h2 class="text-2xl font-bold mb-6">설정 및 관리</h2>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <button id="toggle-allowance" class="w-full flex justify-between items-center p-5 focus:outline-none hover:bg-gray-50 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-blue-100 text-blue-500 w-8 h-8 rounded-full flex justify-center items-center"><i class="fas fa-wallet"></i></div>
+                        <span class="font-bold text-gray-700">기본 용돈 설정</span>
+                    </div>
+                    <i id="icon-allowance" class="fas fa-chevron-down text-gray-400 transition-transform duration-300"></i>
+                </button>
+                <div id="content-allowance" class="hidden px-5 pb-5 pt-2 border-t border-gray-100 bg-gray-50">
+                    <label class="block text-sm text-gray-500 mb-2">한 달 기준 기본 용돈 금액</label>
+                    <div class="flex items-center gap-2 mb-4">
+                        <input type="number" id="settings-allowance" class="flex-1 p-3 rounded-lg border border-gray-200 outline-none focus:border-blue-500 bg-white">
+                        <span class="font-bold text-gray-600">원</span>
+                    </div>
+                    
+                    <label class="block text-sm text-gray-500 mb-2">매월 용돈 받는 날</label>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold text-gray-600">매월</span>
+                        <input type="number" id="settings-allowance-date" min="1" max="31" placeholder="1" class="w-20 p-3 text-center rounded-lg border border-gray-200 outline-none focus:border-blue-500 bg-white">
+                        <span class="text-sm font-bold text-gray-600">일</span>
+                        <div class="flex-1"></div>
+                        <button id="btn-save-allowance" class="bg-blue-500 text-white px-4 py-3 rounded-lg font-bold hover:bg-blue-600">저장</button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">* 설정한 날짜가 되면 해당 달의 용돈이 자동으로 수입에 추가됩니다.</p>
+                </div>
+            </div>
+
+            <!-- 카테고리 관리 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <button id="toggle-cat-settings" class="w-full flex justify-between items-center p-5 focus:outline-none hover:bg-gray-50 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-orange-100 text-orange-500 w-8 h-8 rounded-full flex justify-center items-center"><i class="fas fa-tags"></i></div>
+                        <span class="font-bold text-gray-700">카테고리 관리</span>
+                    </div>
+                    <i id="icon-cat-settings" class="fas fa-chevron-down text-gray-400 transition-transform duration-300"></i>
+                </button>
+                
+                <div id="content-cat-settings" class="hidden px-5 pb-5 pt-4 border-t border-gray-100">
+                    <div class="flex bg-gray-100 rounded-lg p-1 mb-4">
+                        <button id="cat-manage-expense" class="flex-1 py-1.5 text-sm font-bold rounded-md bg-white shadow text-blue-500 transition-all">지출</button>
+                        <button id="cat-manage-income" class="flex-1 py-1.5 text-sm font-bold rounded-md text-gray-500 transition-all">수입</button>
+                    </div>
+
+                    <div id="cat-list-container" class="flex flex-wrap gap-2 mb-4">
+                        <!-- JS 렌더링 -->
+                    </div>
+
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <label class="block text-xs font-bold text-gray-500 mb-2">새 카테고리 추가</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="new-cat-emoji" placeholder="이모지(예:🍔)" class="w-20 p-2 border border-gray-200 rounded-lg outline-none text-sm text-center bg-white" maxlength="2">
+                            <input type="text" id="new-cat-name" placeholder="카테고리 이름" class="flex-1 p-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
+                            <button id="btn-add-cat" class="bg-gray-800 text-white px-3 py-2 rounded-lg text-sm font-bold">추가</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 지출 상세 조회 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <button id="toggle-history" class="w-full flex justify-between items-center p-5 focus:outline-none hover:bg-gray-50 transition">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-purple-100 text-purple-500 w-8 h-8 rounded-full flex justify-center items-center"><i class="fas fa-search"></i></div>
+                        <span class="font-bold text-gray-700">과거 내역 상세 검색</span>
+                    </div>
+                    <i id="icon-history" class="fas fa-chevron-down text-gray-400 transition-transform duration-300"></i>
+                </button>
+                
+                <div id="content-history" class="hidden px-5 pb-5 pt-4 border-t border-gray-100">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">카테고리 선택</label>
+                            <select id="filter-category" class="w-full p-2 border border-gray-200 rounded-lg outline-none bg-white text-sm">
+                                <!-- JS 렌더링 -->
+                            </select>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <div class="flex-1">
+                                <label class="block text-xs font-bold text-gray-500 mb-1">시작일</label>
+                                <input type="date" id="filter-start" class="w-full p-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-xs font-bold text-gray-500 mb-1">종료일</label>
+                                <input type="date" id="filter-end" class="w-full p-2 border border-gray-200 rounded-lg outline-none text-sm bg-white">
+                            </div>
+                        </div>
+                        <button id="btn-search-history" class="w-full bg-purple-500 text-white font-bold py-3 rounded-xl mt-2 hover:bg-purple-600 transition">조회하기</button>
+                    </div>
+
+                    <div id="filtered-results" class="mt-5 space-y-3 hidden">
+                        <div class="flex justify-between items-end border-b border-gray-200 pb-2">
+                            <h4 class="font-bold text-sm text-gray-700">조회 결과</h4>
+                            <span id="filtered-total" class="text-sm font-bold text-purple-600">총 0원</span>
+                        </div>
+                        <div id="filtered-list" class="max-h-60 overflow-y-auto space-y-2 pr-1"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 모달 창들 -->
+    <div id="modal-transactions" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden flex-col justify-end">
+        <div class="bg-white w-full h-[90vh] rounded-t-3xl shadow-2xl flex flex-col transform transition-transform duration-300 translate-y-full" id="modal-content">
+            <div class="flex justify-between items-center p-5 border-b border-gray-100">
+                <h2 class="text-xl font-bold">이번 달 전체 내역</h2>
+                <button id="btn-close-modal" class="text-gray-400 hover:text-gray-700 p-2"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="p-5 flex-1 overflow-y-auto" id="all-transactions-list"></div>
+        </div>
+    </div>
+
+    <div id="modal-edit" class="fixed inset-0 bg-gray-900 bg-opacity-60 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+            <h3 class="font-bold text-lg mb-4">내역 수정</h3>
+            <input type="hidden" id="edit-id">
+            
+            <div class="flex bg-gray-100 rounded-lg p-1 mb-4">
+                <button id="edit-type-expense" class="flex-1 py-1 text-sm font-bold rounded-md bg-white shadow text-blue-500">지출</button>
+                <button id="edit-type-income" class="flex-1 py-1 text-sm font-bold rounded-md text-gray-500">수입</button>
+            </div>
+            <input type="hidden" id="edit-type" value="expense">
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs text-gray-500">날짜</label>
+                    <input type="date" id="edit-date" class="w-full border border-gray-300 rounded p-2 text-sm mt-1 bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500">금액</label>
+                    <input type="number" id="edit-amount" class="w-full border border-gray-300 rounded p-2 text-sm mt-1 bg-white">
+                </div>
+                <div id="edit-category-wrapper">
+                    <label class="block text-xs text-gray-500">카테고리</label>
+                    <select id="edit-category" class="w-full border border-gray-300 rounded p-2 text-sm mt-1 bg-white">
+                        <!-- JS 렌더링 -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500">메모</label>
+                    <input type="text" id="edit-memo" class="w-full border border-gray-300 rounded p-2 text-sm mt-1 bg-white">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button id="btn-edit-cancel" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold">취소</button>
+                <button id="btn-edit-save" class="flex-1 bg-blue-500 text-white py-3 rounded-xl font-bold">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 챗봇 (돈토리) -->
+    <button id="chatbot-btn" class="fixed bottom-28 right-4 bg-white border border-gray-200 text-3xl p-3 rounded-full shadow-lg hover:shadow-xl transition-transform hover:-translate-y-1 z-40 w-14 h-14 flex items-center justify-center">
+        💬
+    </button>
+
+    <div id="chatbot-window" class="fixed bottom-28 right-4 w-[90%] max-w-[340px] bg-white rounded-2xl shadow-2xl border border-gray-200 hidden z-50 flex flex-col overflow-hidden origin-bottom-right transition-all">
+        <div class="bg-gray-800 text-white p-4 font-bold flex justify-between items-center">
+            <span class="flex items-center gap-2 text-lg">💬 돈토리</span>
+            <button id="chatbot-close" class="hover:text-gray-300 transition-colors"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        
+        <div id="chat-messages" class="h-72 p-4 overflow-y-auto bg-gray-50 flex flex-col gap-3 text-sm">
+            <div class="bg-white text-gray-800 p-3 rounded-2xl rounded-tl-none self-start max-w-[85%] shadow-sm border border-gray-200 leading-relaxed">
+                안녕! 이번 달 지갑 상태 어때? 💸<br>소비 습관이나 살까 말까 고민되는 게 있으면 편하게 물어봐. 다정하게 조언해 줄게!
+            </div>
+        </div>
+        
+        <div class="p-3 bg-white border-t border-gray-100 flex gap-2 items-center">
+            <input type="text" id="chat-input" class="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all" placeholder="이번 달 저축 잘하고 있어?">
+            <button id="chat-send" class="bg-gray-800 text-white w-10 h-10 rounded-full shadow hover:bg-gray-900 flex items-center justify-center transition-colors"><i class="fas fa-paper-plane text-xs relative right-[1px]"></i></button>
+        </div>
+    </div>
+
+    <!-- 하단 네비게이션 바 (가운데 돋보이는 홈 버튼 적용) -->
+    <nav class="fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-between items-center px-4 pb-4 pt-3 z-30 max-w-md left-1/2 transform -translate-x-1/2 rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
+        <button class="bottom-nav-item flex flex-col items-center gap-1 w-[18%] text-gray-400 transition-colors" data-target="calendar">
+            <i class="far fa-calendar-alt text-lg"></i><span class="text-[10px] font-medium">달력</span>
+        </button>
+        <button class="bottom-nav-item flex flex-col items-center gap-1 w-[18%] text-gray-400 transition-colors" data-target="analysis">
+            <i class="fas fa-chart-pie text-lg"></i><span class="text-[10px] font-medium">분석</span>
+        </button>
+        
+        <!-- 중앙 돋보이는 홈 버튼 -->
+        <div class="w-[20%] flex justify-center relative">
+            <button class="bottom-nav-item active absolute -top-8 bg-blue-500 text-white w-16 h-16 rounded-full home-fab flex flex-col items-center justify-center border-[5px] border-white transition-transform" data-target="dashboard">
+                <i class="fas fa-home text-2xl relative bottom-[1px]"></i>
+            </button>
+        </div>
+        
+        <button class="bottom-nav-item flex flex-col items-center gap-1 w-[18%] text-gray-400 transition-colors" data-target="add">
+            <i class="fas fa-plus-circle text-lg"></i><span class="text-[10px] font-medium">추가</span>
+        </button>
+        <button class="bottom-nav-item flex flex-col items-center gap-1 w-[18%] text-gray-400 transition-colors" data-target="settings">
+            <i class="fas fa-cog text-lg"></i><span class="text-[10px] font-medium">설정</span>
+        </button>
+    </nav>
+
+    <script>
+        // 1. 유효한 API 키 적용 완료
+        const GEMINI_API_KEY = "AQ.Ab8RN6ItDAAjqN9NDWTwNgMqM1hvQimqEqFlp46p7bewn1iheA"; 
+
+        const defaultExpenseCats = [
+            { name: '식비', icon: '🍚', color: 'bg-orange-100 text-orange-500' },
+            { name: '간식·카페', icon: '☕', color: 'bg-yellow-100 text-yellow-600' },
+            { name: '교통', icon: '🚌', color: 'bg-blue-100 text-blue-500' },
+            { name: '문화·여가', icon: '🎬', color: 'bg-purple-100 text-purple-500' },
+            { name: '쇼핑', icon: '🛍️', color: 'bg-pink-100 text-pink-500' },
+            { name: '학용품', icon: '✏️', color: 'bg-green-100 text-green-500' },
+            { name: '게임·콘텐츠', icon: '🎮', color: 'bg-indigo-100 text-indigo-500' },
+            { name: '저축', icon: '💰', color: 'bg-teal-100 text-teal-500' },
+            { name: '기타', icon: '📦', color: 'bg-gray-100 text-gray-500' }
+        ];
+
+        const defaultIncomeCats = [
+            { name: '용돈', icon: '💸', color: 'bg-blue-100 text-blue-500' },
+            { name: '알바', icon: '🏪', color: 'bg-green-100 text-green-500' },
+            { name: '중고거래', icon: '📱', color: 'bg-orange-100 text-orange-500' },
+            { name: '기타', icon: '💰', color: 'bg-gray-100 text-gray-500' }
+        ];
+
+        let expenseCategories = JSON.parse(localStorage.getItem('expenseCats')) || defaultExpenseCats;
+        let incomeCategories = JSON.parse(localStorage.getItem('incomeCats')) || defaultIncomeCats;
+        let allowanceAmount = parseInt(localStorage.getItem('allowanceAmount')) || 0; // 초기 용돈 0원으로 설정
+        let allowanceDate = parseInt(localStorage.getItem('allowanceDate')) || 1;
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+        
+        let chartInstances = {};
+        let currentChartPeriod = '1m'; 
+        let currentCalDate = new Date(); // 달력용 현재 조회 날짜
+
+        function saveData() {
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            localStorage.setItem('allowanceAmount', allowanceAmount.toString());
+            localStorage.setItem('allowanceDate', allowanceDate.toString());
+            localStorage.setItem('expenseCats', JSON.stringify(expenseCategories));
+            localStorage.setItem('incomeCats', JSON.stringify(incomeCategories));
+        }
+
+        // 헤더 로고 클릭 시 홈으로
+        document.getElementById('logo-home').addEventListener('click', () => {
+            document.querySelector('.bottom-nav-item[data-target="dashboard"]').click();
+        });
+
+        // 탭 네비게이션 제어
+        document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // 활성화 스타일 초기화
+                document.querySelectorAll('.bottom-nav-item').forEach(b => {
+                    b.classList.remove('active'); 
+                    if(b.dataset.target !== 'dashboard') {
+                        b.classList.remove('active-text');
+                        b.classList.add('text-gray-400');
+                    } else {
+                        // 중앙 홈 버튼은 회색톤 
+                        b.classList.replace('bg-blue-500', 'bg-gray-300');
+                    }
+                });
+                
+                const targetBtn = e.currentTarget;
+                targetBtn.classList.add('active');
+                
+                if(targetBtn.dataset.target !== 'dashboard') {
+                    targetBtn.classList.remove('text-gray-400');
+                    targetBtn.classList.add('active-text');
+                } else {
+                    targetBtn.classList.replace('bg-gray-300', 'bg-blue-500');
+                }
+
+                document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+                const targetId = targetBtn.getAttribute('data-target');
+                document.getElementById(`tab-${targetId}`).classList.add('active');
+
+                if(targetId === 'dashboard') updateDashboard();
+                if(targetId === 'calendar') renderCalendar();
+                if(targetId === 'add') renderAddCategoryGrid();
+                if(targetId === 'analysis') { calculateScore(); renderCharts(); }
+                if(targetId === 'settings') { renderCatSettingsList(); updateSelectOptions(); }
+            });
+        });
+
+        // 기타 헬퍼 함수들
+        function getCategoryData(type, name) {
+            const list = type === 'expense' ? expenseCategories : incomeCategories;
+            return list.find(c => c.name === name) || { name, icon: '📌', color: 'bg-gray-100 text-gray-500' };
+        }
+
+        function getCutoffDate(periodStr) {
+            if (periodStr === 'all') return new Date(0);
+            const d = new Date();
+            if (periodStr === '1w') d.setDate(d.getDate() - 7);
+            else if (periodStr === '1m') d.setMonth(d.getMonth() - 1);
+            else if (periodStr === '3m') d.setMonth(d.getMonth() - 3);
+            else if (periodStr === '6m') d.setMonth(d.getMonth() - 6);
+            else if (periodStr === '1y') d.setFullYear(d.getFullYear() - 1);
+            return d;
+        }
+
+        function getFilteredTransactions(periodStr) {
+            if (periodStr === 'all') return transactions;
+            const cutoff = getCutoffDate(periodStr).toISOString().split('T')[0];
+            return transactions.filter(t => t.date >= cutoff);
+        }
+
+        function getCurrentMonthTransactions() {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            return transactions.filter(t => t.date.startsWith(currentMonth));
+        }
+
+        function checkAndInjectAllowance() {
+            const now = new Date();
+            const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            
+            // 용돈이 0원보다 클 때만 자동 입력
+            if (allowanceAmount > 0 && now.getDate() >= allowanceDate) {
+                const hasAllowance = transactions.some(t => 
+                    t.type === 'income' && t.category === '용돈' && t.date.startsWith(currentYearMonth)
+                );
+
+                if (!hasAllowance) {
+                    const injectDate = new Date(now.getFullYear(), now.getMonth(), allowanceDate);
+                    transactions.push({
+                        id: Date.now() + Math.random(),
+                        type: 'income', amount: allowanceAmount, category: '용돈',
+                        date: injectDate.toISOString().split('T')[0], memo: '정기 용돈 (자동입력)'
+                    });
+                    saveData();
+                }
+            }
+        }
+
+        // ================= 대시보드 =================
+        function updateDashboard() {
+            checkAndInjectAllowance(); 
+
+            const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+            const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+            const currentBalance = totalIncome - totalExpense;
+
+            const currentMonthTxs = getCurrentMonthTransactions();
+            const monthIncome = currentMonthTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+            const monthExpense = currentMonthTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+
+            document.getElementById('dashboard-balance').textContent = currentBalance.toLocaleString();
+            document.getElementById('dashboard-income').textContent = monthIncome.toLocaleString();
+            document.getElementById('dashboard-expense').textContent = monthExpense.toLocaleString();
+
+            const recentContainer = document.getElementById('recent-transactions');
+            recentContainer.innerHTML = '';
+            const recentTxs = [...transactions].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+            
+            if(recentTxs.length === 0) {
+                recentContainer.innerHTML = '<p class="text-center text-gray-400 py-6 text-sm">아직 기록된 내역이 없어요.</p>';
+            } else {
+                recentTxs.forEach(t => {
+                    const catData = getCategoryData(t.type, t.category);
+                    const sign = t.type === 'expense' ? '-' : '+';
+                    recentContainer.innerHTML += `
+                        <div class="flex justify-between items-center border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+                            <div class="flex items-center gap-3">
+                                <div class="category-icon ${catData.color} text-lg">${catData.icon}</div>
+                                <div>
+                                    <p class="font-bold text-sm text-gray-800">${t.category}</p>
+                                    <p class="text-[11px] text-gray-400">${t.date} ${t.memo ? `· ${t.memo}` : ''}</p>
+                                </div>
+                            </div>
+                            <span class="font-bold text-sm ${t.type === 'expense' ? 'text-gray-800' : 'text-blue-500'}">
+                                ${sign}${t.amount.toLocaleString()}원
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // ================= 달력 탭 로직 =================
+        function renderCalendar() {
+            const y = currentCalDate.getFullYear();
+            const m = currentCalDate.getMonth();
+            document.getElementById('cal-month-title').textContent = `${y}년 ${m + 1}월`;
+            
+            const firstDay = new Date(y, m, 1).getDay();
+            const lastDate = new Date(y, m + 1, 0).getDate();
+            
+            const grid = document.getElementById('cal-grid');
+            grid.innerHTML = '';
+            
+            // 빈 칸 채우기
+            for(let i = 0; i < firstDay; i++) {
+                grid.innerHTML += `<div class="min-h-[55px] bg-gray-50 rounded-lg opacity-50"></div>`;
+            }
+            
+            // 날짜 칸 채우기
+            for(let d = 1; d <= lastDate; d++) {
+                const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dayTxs = transactions.filter(t => t.date === dateStr);
+                
+                let inSum = 0; let outSum = 0;
+                dayTxs.forEach(t => { if(t.type === 'income') inSum += t.amount; else outSum += t.amount; });
+                
+                let badgeHTML = '';
+                if(inSum > 0) badgeHTML += `<div class="text-[9px] text-blue-500 font-bold leading-tight mt-0.5">+${(inSum/10000).toFixed(1).replace('.0','')}만</div>`;
+                if(outSum > 0) badgeHTML += `<div class="text-[9px] text-red-500 font-bold leading-tight mt-0.5">-${(outSum/10000).toFixed(1).replace('.0','')}만</div>`;
+                
+                const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                
+                grid.innerHTML += `
+                    <div class="min-h-[55px] p-1 border border-gray-100 rounded-lg flex flex-col items-center cursor-pointer hover:bg-gray-50 transition-colors ${isToday ? 'ring-2 ring-blue-400 bg-blue-50' : 'bg-white'}" onclick="showDayDetails('${dateStr}')">
+                        <span class="text-xs ${isToday ? 'font-bold text-blue-600' : 'text-gray-700'}">${d}</span>
+                        <div class="w-full text-center">${badgeHTML}</div>
+                    </div>
+                `;
+            }
+        }
+
+        window.showDayDetails = function(dateStr) {
+            const dayTxs = transactions.filter(t => t.date === dateStr);
+            document.getElementById('cal-day-details').classList.remove('hidden');
+            const [y, m, d] = dateStr.split('-');
+            document.getElementById('cal-day-title').textContent = `${m}월 ${d}일 상세 내역`;
+            
+            const list = document.getElementById('cal-day-list');
+            list.innerHTML = '';
+            if(dayTxs.length === 0) {
+                list.innerHTML = '<p class="text-xs text-gray-400 text-center py-2">기록된 소비 내역이 없습니다.</p>';
+            } else {
+                dayTxs.forEach(t => {
+                    const catData = getCategoryData(t.type, t.category);
+                    const isExp = t.type === 'expense';
+                    list.innerHTML += `
+                        <div class="flex justify-between items-center text-sm border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-gray-100 rounded-full w-6 h-6 flex justify-center items-center text-xs">${catData.icon}</span>
+                                <span class="text-gray-700 font-medium">${t.category} ${t.memo ? `<span class="text-gray-400 text-xs font-normal">(${t.memo})</span>` : ''}</span>
+                            </div>
+                            <span class="font-bold ${isExp ? 'text-red-500' : 'text-blue-500'}">${isExp ? '-' : '+'}${t.amount.toLocaleString()}원</span>
+                        </div>
+                    `;
+                });
+            }
+        };
+
+        document.getElementById('cal-prev').addEventListener('click', () => { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); });
+        document.getElementById('cal-next').addEventListener('click', () => { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); });
+
+        // ================= 추가 탭 =================
+        let currentAddType = 'expense';
+        document.getElementById('add-date').valueAsDate = new Date();
+
+        function renderAddCategoryGrid() {
+            const grid = document.getElementById('category-grid');
+            grid.innerHTML = '';
+            const list = currentAddType === 'expense' ? expenseCategories : incomeCategories;
+            
+            list.forEach((cat, index) => {
+                const btn = document.createElement('button');
+                btn.className = `p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${index === 0 ? cat.color + ' ring-2 ring-blue-400 scale-105 shadow-sm' : 'bg-gray-50 text-gray-400'}`;
+                btn.innerHTML = `<span class="text-2xl mb-1">${cat.icon}</span><span class="text-[10px] font-bold">${cat.name}</span>`;
+                if (index === 0) document.getElementById('add-category').value = cat.name;
+
+                btn.onclick = () => {
+                    document.querySelectorAll('#category-grid button').forEach(b => {
+                        b.className = 'p-3 rounded-xl flex flex-col items-center gap-1 transition-all bg-gray-50 text-gray-400';
+                    });
+                    btn.className = `p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${cat.color} ring-2 ring-blue-400 scale-105 shadow-sm`;
+                    document.getElementById('add-category').value = cat.name;
+                };
+                grid.appendChild(btn);
+            });
+        }
+
+        document.getElementById('type-expense').addEventListener('click', (e) => {
+            currentAddType = 'expense';
+            e.target.classList.replace('text-gray-500', 'text-blue-500'); e.target.classList.add('bg-white', 'shadow');
+            document.getElementById('type-income').classList.replace('text-blue-500', 'text-gray-500'); document.getElementById('type-income').classList.remove('bg-white', 'shadow');
+            renderAddCategoryGrid();
+        });
+        document.getElementById('type-income').addEventListener('click', (e) => {
+            currentAddType = 'income';
+            e.target.classList.replace('text-gray-500', 'text-blue-500'); e.target.classList.add('bg-white', 'shadow');
+            document.getElementById('type-expense').classList.replace('text-blue-500', 'text-gray-500'); document.getElementById('type-expense').classList.remove('bg-white', 'shadow');
+            renderAddCategoryGrid();
+        });
+
+        document.getElementById('btn-save').addEventListener('click', () => {
+            const amount = parseInt(document.getElementById('add-amount').value);
+            if(!amount) return alert('금액을 입력해주세요!');
+            
+            transactions.push({
+                id: Date.now(), type: currentAddType, amount: amount,
+                category: document.getElementById('add-category').value,
+                date: document.getElementById('add-date').value,
+                memo: document.getElementById('add-memo').value
+            });
+            saveData();
+            
+            document.getElementById('add-amount').value = '';
+            document.getElementById('add-memo').value = '';
+            document.querySelector('.bottom-nav-item[data-target="dashboard"]').click();
+        });
+
+        // ================= 분석 탭 =================
+        function calculateScore() {
+            const currentTxs = getCurrentMonthTransactions();
+            const expenseTxs = currentTxs.filter(t => t.type === 'expense');
+            const totalExpense = expenseTxs.reduce((sum, t) => sum + t.amount, 0);
+            const savedAmount = expenseTxs.filter(t => t.category === '저축').reduce((sum, t) => sum + t.amount, 0);
+            
+            const catSums = {};
+            expenseTxs.forEach(t => { if(t.category !== '저축') catSums[t.category] = (catSums[t.category] || 0) + t.amount; });
+            const maxCatAmount = Math.max(0, ...Object.values(catSums));
+            const topCat = Object.keys(catSums).find(k => catSums[k] === maxCatAmount);
+            
+            let score = 100; 
+            let feedback = []; 
+            let grade = ""; let color = "";
+
+            // 예산이 0원이면 비교 생략 혹은 조정
+            if(allowanceAmount > 0) {
+                if (totalExpense > allowanceAmount * 1.2) {
+                    score -= 30; feedback.push("💸 예산을 크게 초과했어요. 지출 통제가 시급합니다!");
+                } else if (totalExpense > allowanceAmount) {
+                    score -= 20; feedback.push("⚠️ 예산을 조금 초과해서 썼어요. 다음 달엔 꼭 예산 안에서 해결해봐요.");
+                } else if (totalExpense > allowanceAmount * 0.9) {
+                    score -= 5; feedback.push("💡 예산에 거의 딱 맞게 썼네요. 조금 더 여유 자금을 남기는 연습을 해보세요.");
+                }
+
+                if (savedAmount >= allowanceAmount * 0.2) {
+                    score += 10; feedback.push("🌟 저축률이 아주 높아요! 미래를 준비하는 훌륭한 습관입니다.");
+                } else if (savedAmount > 0) {
+                    score += 5; feedback.push("👍 적은 금액이라도 꾸준히 저축하는 모습이 좋아요.");
+                } else {
+                    score -= 20; feedback.push("🚨 이번 달은 저축을 전혀 하지 않았네요. 비상금이 없으면 나중에 꼭 후회하게 돼요!");
+                }
+            } else {
+                 if (totalExpense > 0) {
+                    feedback.push("⚠️ 설정된 예산(용돈)이 0원인데 지출이 발생했어요. 예산 설정을 확인해주세요.");
+                 } else {
+                    feedback.push("💡 아직 등록된 지출 내역이 없습니다.");
+                 }
+            }
+
+
+            if (totalExpense > 0 && maxCatAmount > totalExpense * 0.5) {
+                if(topCat !== '식비' && topCat !== '교통') { 
+                    score -= 15; 
+                    feedback.push(`⚖️ '${topCat}' 카테고리에 지출이 너무 쏠려있어요. 균형 있는 소비가 필요해요.`); 
+                }
+            }
+            
+            score = Math.max(0, Math.min(100, score));
+
+            if (score >= 90) { grade = "우수 🏆"; color = "bg-green-500"; if(feedback.length===0) feedback.push("군더더기 없는 완벽한 소비 습관입니다! 유지하세요."); } 
+            else if (score >= 70) { grade = "보통 👀"; color = "bg-yellow-500"; } 
+            else { grade = "위험 🚨"; color = "bg-red-500"; }
+
+            document.getElementById('score-value').textContent = score;
+            document.getElementById('score-badge').textContent = grade;
+            document.getElementById('score-badge').className = `px-3 py-1 rounded-full text-xs font-bold text-white ${color}`;
+            
+            const bar = document.getElementById('score-bar');
+            bar.className = `h-3 rounded-full transition-all duration-1000 ease-out ${color}`;
+            setTimeout(() => { bar.style.width = `${score}%`; }, 100);
+            
+            const feedbackEl = document.getElementById('score-feedback');
+            feedbackEl.innerHTML = '';
+            feedback.forEach(text => {
+                feedbackEl.innerHTML += `<li>${text}</li>`;
+            });
+        }
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.replace('bg-blue-500', 'bg-white'); b.classList.replace('text-white', 'text-gray-600'); b.classList.add('border-gray-200');
+                });
+                const target = e.currentTarget;
+                target.classList.replace('bg-white', 'bg-blue-500'); target.classList.replace('text-gray-600', 'text-white'); target.classList.remove('border-gray-200');
+                currentChartPeriod = target.dataset.period;
+                renderCharts();
+            });
+        });
+
+        function renderCharts() {
+            const filteredTxs = getFilteredTransactions(currentChartPeriod);
+            const expenseTxs = filteredTxs.filter(t => t.type === 'expense');
+
+            const catData = {};
+            expenseTxs.forEach(t => { catData[t.category] = (catData[t.category] || 0) + t.amount; });
+            const sortedCats = Object.keys(catData).sort((a,b) => catData[b] - catData[a]);
+            const top1 = sortedCats.length > 0 ? sortedCats[0] : '내역 없음';
+            
+            // 또래 통계 렌더링
+            document.getElementById('my-top1').textContent = top1;
+            const top1Advice = document.getElementById('peer-top1-advice');
+            if(top1 === '내역 없음') {
+                 top1Advice.innerHTML = "아직 등록된 지출 내역이 없습니다.";
+            } else if(top1 === '식비' || top1 === '간식·카페') {
+                top1Advice.innerHTML = "<span class='text-blue-600 font-bold'>평균적인 모습이네요!</span> 하지만 밥 대신 군것질만 하는 건 조심하세요.";
+            } else if(top1 === '쇼핑' || top1 === '게임·콘텐츠') {
+                top1Advice.innerHTML = "<span class='text-red-500 font-bold'>오락성 지출이 가장 많네요.</span> 충동구매를 줄이는 연습을 해보세요.";
+            } else {
+                top1Advice.innerHTML = "나만의 확고한 관심사가 있나 보네요. 예산 내에서 잘 조절하고 있나요?";
+            }
+
+            const currentMonthTxs = getCurrentMonthTransactions();
+            const mExp = currentMonthTxs.filter(t => t.type === 'expense' && t.category !== '저축').reduce((s,t) => s+t.amount, 0);
+            const mSave = currentMonthTxs.filter(t => t.category === '저축').reduce((s,t) => s+t.amount, 0);
+            const saveRate = (mExp + mSave) === 0 ? 0 : Math.round((mSave / (mExp + mSave)) * 100);
+            
+            document.getElementById('my-save-rate').textContent = `${saveRate}%`;
+            const saveAdvice = document.getElementById('peer-save-advice');
+            if((mExp + mSave) === 0) saveAdvice.innerHTML = "아직 등록된 지출 내역이 없습니다.";
+            else if(saveRate >= 20) saveAdvice.innerHTML = "<span class='text-blue-600 font-bold'>평균 이상으로 훌륭합니다!</span> 목표를 가지고 쑥쑥 모아보세요.";
+            else if(saveRate >= 10) saveAdvice.innerHTML = "딱 평균 정도네요. 조금만 더 아껴서 비율을 늘려보는 건 어떨까요?";
+            else if(saveRate > 0) saveAdvice.innerHTML = "<span class='text-orange-500 font-bold'>평균보다 낮아요.</span> 하루 커피 한 잔 값만 저축으로 돌려보세요.";
+            else saveAdvice.innerHTML = "<span class='text-red-500 font-bold'>저축 0%입니다!</span> 아주 적은 금액이라도 모으는 습관부터 들이세요.";
+
+            // 카테고리 차트 렌더링
+            const bgColors = sortedCats.map(cat => {
+                const colorMap = { 'orange': '#f97316', 'yellow': '#eab308', 'blue': '#3b82f6', 'purple': '#a855f7', 'pink': '#ec4899', 'green': '#22c55e', 'indigo': '#6366f1', 'teal': '#14b8a6', 'gray': '#9ca3af' };
+                const c = expenseCategories.find(x => x.name === cat);
+                if(!c) return '#cbd5e1';
+                const colorStr = c.color.split('text-')[1].split('-')[0];
+                return colorMap[colorStr] || '#cbd5e1';
+            });
+
+            if(chartInstances.cat) chartInstances.cat.destroy();
+            const ctxCat = document.getElementById('categoryChart').getContext('2d');
+            chartInstances.cat = new Chart(ctxCat, {
+                type: 'doughnut',
+                data: { labels: sortedCats, datasets: [{ data: sortedCats.map(c => catData[c]), backgroundColor: bgColors, borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: {family: 'Pretendard', size: 11} } } } }
+            });
+
+            // 잔액 추이 렌더링
+            const allTxsSorted = [...transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
+            let runningBal = 0;
+            const dailyBalances = {};
+            
+            allTxsSorted.forEach(t => {
+                if(t.type === 'income') runningBal += t.amount;
+                else runningBal -= t.amount;
+                dailyBalances[t.date] = runningBal; 
+            });
+
+            const cutoffStr = getCutoffDate(currentChartPeriod).toISOString().split('T')[0];
+            const labels = []; const dataPoints = [];
+
+            Object.keys(dailyBalances).sort().forEach(date => {
+                if (currentChartPeriod === 'all' || date >= cutoffStr) {
+                    labels.push(date); dataPoints.push(dailyBalances[date]);
+                }
+            });
+
+            if(chartInstances.bal) chartInstances.bal.destroy();
+            const ctxBal = document.getElementById('balanceChart').getContext('2d');
+            chartInstances.bal = new Chart(ctxBal, {
+                type: 'line',
+                data: {
+                    labels: labels.length > 0 ? labels : ['데이터 없음'],
+                    datasets: [{
+                        label: '잔액', data: dataPoints.length > 0 ? dataPoints : [0],
+                        borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2, fill: true, tension: 0,
+                        pointRadius: labels.length > 30 ? 0 : 3, pointHoverRadius: 5
+                    }]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#f1f5f9' }, ticks: { maxTicksLimit: 5, maxRotation: 0, font: { size: 10 } } },
+                        y: { display: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, callback: function(value) { return (value / 10000) + '만'; } } }
+                    },
+                    interaction: { mode: 'index', intersect: false }
+                }
+            });
+        }
+
+        // ================= 설정 탭 =================
+        document.getElementById('toggle-allowance').addEventListener('click', () => {
+            document.getElementById('content-allowance').classList.toggle('hidden');
+            document.getElementById('icon-allowance').classList.toggle('rotate-180');
+        });
+        document.getElementById('settings-allowance').value = allowanceAmount;
+        document.getElementById('settings-allowance-date').value = allowanceDate;
+        
+        document.getElementById('btn-save-allowance').addEventListener('click', () => {
+            const amt = parseInt(document.getElementById('settings-allowance').value) || 0;
+            const dateVal = parseInt(document.getElementById('settings-allowance-date').value) || 1;
+            if (dateVal < 1 || dateVal > 31) return alert("날짜는 1일에서 31일 사이로 입력해주세요.");
+            
+            allowanceAmount = amt;
+            allowanceDate = dateVal;
+            saveData(); 
+            checkAndInjectAllowance();
+            updateDashboard();
+            alert('기본 용돈 설정이 저장되었습니다.');
+        });
+
+        document.getElementById('toggle-cat-settings').addEventListener('click', () => {
+            document.getElementById('content-cat-settings').classList.toggle('hidden');
+            document.getElementById('icon-cat-settings').classList.toggle('rotate-180');
+        });
+        
+        let currentCatManageType = 'expense';
+        document.getElementById('cat-manage-expense').addEventListener('click', (e) => {
+            currentCatManageType = 'expense';
+            e.target.classList.replace('text-gray-500', 'text-blue-500'); e.target.classList.add('bg-white', 'shadow');
+            document.getElementById('cat-manage-income').classList.replace('text-blue-500', 'text-gray-500'); document.getElementById('cat-manage-income').classList.remove('bg-white', 'shadow');
+            renderCatSettingsList();
+        });
+        document.getElementById('cat-manage-income').addEventListener('click', (e) => {
+            currentCatManageType = 'income';
+            e.target.classList.replace('text-gray-500', 'text-blue-500'); e.target.classList.add('bg-white', 'shadow');
+            document.getElementById('cat-manage-expense').classList.replace('text-blue-500', 'text-gray-500'); document.getElementById('cat-manage-expense').classList.remove('bg-white', 'shadow');
+            renderCatSettingsList();
+        });
+
+        function renderCatSettingsList() {
+            const container = document.getElementById('cat-list-container');
+            container.innerHTML = '';
+            const list = currentCatManageType === 'expense' ? expenseCategories : incomeCategories;
+            list.forEach(cat => {
+                container.innerHTML += `
+                    <div class="flex items-center gap-1 bg-white border border-gray-200 px-3 py-1.5 rounded-full text-sm">
+                        <span>${cat.icon} ${cat.name}</span>
+                        <button onclick="deleteCategory('${cat.name}')" class="text-gray-400 hover:text-red-500 ml-1 focus:outline-none"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+            });
+        }
+
+        window.deleteCategory = function(name) {
+            if(!confirm(`'${name}' 카테고리를 삭제할까요?`)) return;
+            if (currentCatManageType === 'expense') { expenseCategories = expenseCategories.filter(c => c.name !== name); } 
+            else { incomeCategories = incomeCategories.filter(c => c.name !== name); }
+            saveData(); renderCatSettingsList(); updateSelectOptions();
+        };
+
+        // 이모티콘 직접 입력하여 카테고리 추가
+        document.getElementById('btn-add-cat').addEventListener('click', () => {
+            const name = document.getElementById('new-cat-name').value.trim();
+            const emoji = document.getElementById('new-cat-emoji').value.trim() || '📌';
+            
+            if(!name) return alert('카테고리 이름을 입력해주세요.');
+            
+            const newCat = { name, icon: emoji, color: 'bg-gray-100 text-gray-700' };
+            if (currentCatManageType === 'expense') expenseCategories.push(newCat);
+            else incomeCategories.push(newCat);
+            
+            document.getElementById('new-cat-name').value = '';
+            document.getElementById('new-cat-emoji').value = '';
+            saveData(); renderCatSettingsList(); updateSelectOptions();
+        });
+
+        document.getElementById('toggle-history').addEventListener('click', () => {
+            document.getElementById('content-history').classList.toggle('hidden');
+            document.getElementById('icon-history').classList.toggle('rotate-180');
+        });
+
+        function updateSelectOptions() {
+            const filterSelect = document.getElementById('filter-category');
+            filterSelect.innerHTML = '<option value="all">전체 카테고리 (지출)</option>';
+            expenseCategories.forEach(c => { filterSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`; });
+        }
+
+        document.getElementById('btn-search-history').addEventListener('click', () => {
+            const cat = document.getElementById('filter-category').value;
+            const start = document.getElementById('filter-start').value;
+            const end = document.getElementById('filter-end').value;
+
+            let result = transactions.filter(t => t.type === 'expense');
+            if (cat !== 'all') result = result.filter(t => t.category === cat);
+            if (start) result = result.filter(t => t.date >= start);
+            if (end) result = result.filter(t => t.date <= end);
+            
+            result.sort((a,b) => new Date(b.date) - new Date(a.date));
+            const total = result.reduce((sum, t) => sum + t.amount, 0);
+
+            document.getElementById('filtered-total').textContent = `총 ${total.toLocaleString()}원`;
+            const listContainer = document.getElementById('filtered-list');
+            listContainer.innerHTML = '';
+            
+            if(result.length === 0) listContainer.innerHTML = '<p class="text-center text-gray-400 py-4 text-sm">해당 조건의 내역이 없습니다.</p>';
+            else {
+                result.forEach(t => {
+                    listContainer.innerHTML += `
+                        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                            <div>
+                                <p class="font-bold text-sm text-gray-700">${t.category}</p>
+                                <p class="text-xs text-gray-400">${t.date} ${t.memo ? `· ${t.memo}` : ''}</p>
+                            </div>
+                            <span class="font-bold text-sm text-gray-800">-${t.amount.toLocaleString()}원</span>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('filtered-results').classList.remove('hidden');
+        });
+
+        // 모달창 (전체내역, 수정, 삭제) 처리 생략 없이 원본 유지
+        const modalTransactions = document.getElementById('modal-transactions');
+        const modalContent = document.getElementById('modal-content');
+        
+        document.getElementById('balance-card').addEventListener('click', () => {
+            renderAllTransactions(); modalTransactions.classList.remove('hidden');
+            setTimeout(() => { modalContent.classList.remove('translate-y-full'); }, 10);
+        });
+
+        document.getElementById('btn-close-modal').addEventListener('click', () => {
+            modalContent.classList.add('translate-y-full');
+            setTimeout(() => { modalTransactions.classList.add('hidden'); }, 300);
+        });
+
+        function renderAllTransactions() {
+            const list = document.getElementById('all-transactions-list');
+            list.innerHTML = '';
+            const currentTxs = getCurrentMonthTransactions().sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            if(currentTxs.length === 0) { list.innerHTML = '<div class="text-center text-gray-400 mt-10">이번 달 기록이 없어요.</div>'; return; }
+
+            currentTxs.forEach(t => {
+                const catData = getCategoryData(t.type, t.category);
+                const isExp = t.type === 'expense';
+                list.innerHTML += `
+                    <div class="flex justify-between items-center border-b border-gray-100 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="category-icon ${catData.color} text-lg">${catData.icon}</div>
+                            <div>
+                                <p class="font-bold text-gray-800">${t.category}</p>
+                                <p class="text-xs text-gray-400">${t.date} ${t.memo ? `· ${t.memo}` : ''}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold mb-1 ${isExp ? 'text-gray-800' : 'text-blue-500'}">
+                                ${isExp ? '-' : '+'}${t.amount.toLocaleString()}원
+                            </p>
+                            <div class="flex gap-2 justify-end">
+                                <button onclick="openEditModal(${t.id})" class="text-xs text-blue-500 bg-blue-50 px-2 py-1 rounded">수정</button>
+                                <button onclick="confirmDelete(${t.id})" class="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">삭제</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        let targetDeleteId = null;
+        window.confirmDelete = function(id) {
+            targetDeleteId = id;
+            if(confirm('정말 삭제할까요? 복구할 수 없습니다.')) {
+                transactions = transactions.filter(t => t.id !== targetDeleteId);
+                saveData(); renderAllTransactions(); updateDashboard();
+                targetDeleteId = null;
+            }
+        };
+
+        const modalEdit = document.getElementById('modal-edit');
+        const editTypeInput = document.getElementById('edit-type');
+        const editCategorySelect = document.getElementById('edit-category');
+
+        function updateEditCategoryOptions(type) {
+            editCategorySelect.innerHTML = '';
+            const list = type === 'expense' ? expenseCategories : incomeCategories;
+            list.forEach(c => { editCategorySelect.innerHTML += `<option value="${c.name}">${c.name}</option>`; });
+        }
+
+        document.getElementById('edit-type-expense').addEventListener('click', (e) => {
+            editTypeInput.value = 'expense';
+            e.target.classList.replace('text-gray-500', 'text-blue-500'); e.target.classList.add('bg-white', 'shadow');
+            document.getElementById('edit-type-income').classList.replace('text-blue-500', 'text-gray-500'); document.getElementById('edit-type-income').classList.remove('bg-white', 'shadow');
+            updateEditCategoryOptions('expense');
+        });
+        document.getElementById('edit-type-income').addEventListener('click', (e) => {
+            editTypeInput.value = 'income';
+            e.target.classList.replace('text-gray-500', 'text-blue-500'); e.target.classList.add('bg-white', 'shadow');
+            document.getElementById('edit-type-expense').classList.replace('text-blue-500', 'text-gray-500'); document.getElementById('edit-type-expense').classList.remove('bg-white', 'shadow');
+            updateEditCategoryOptions('income');
+        });
+
+        window.openEditModal = function(id) {
+            const t = transactions.find(x => x.id === id);
+            if(!t) return;
+            document.getElementById('edit-id').value = t.id;
+            document.getElementById('edit-date').value = t.date;
+            document.getElementById('edit-amount').value = t.amount;
+            document.getElementById('edit-memo').value = t.memo || '';
+            
+            if(t.type === 'expense') document.getElementById('edit-type-expense').click();
+            else document.getElementById('edit-type-income').click();
+            
+            setTimeout(() => { editCategorySelect.value = t.category; }, 10);
+            modalEdit.classList.remove('hidden');
+        };
+
+        document.getElementById('btn-edit-cancel').addEventListener('click', () => { modalEdit.classList.add('hidden'); });
+        document.getElementById('btn-edit-save').addEventListener('click', () => {
+            const id = parseInt(document.getElementById('edit-id').value);
+            const index = transactions.findIndex(x => x.id === id);
+            if(index > -1) {
+                transactions[index].type = editTypeInput.value;
+                transactions[index].date = document.getElementById('edit-date').value;
+                transactions[index].amount = parseInt(document.getElementById('edit-amount').value);
+                transactions[index].memo = document.getElementById('edit-memo').value;
+                transactions[index].category = editCategorySelect.value;
+                saveData(); modalEdit.classList.add('hidden'); renderAllTransactions(); updateDashboard();
+            }
+        });
+
+        // ================= 데이터 초기화 버그 해결 =================
+        document.getElementById('reset-data-btn').addEventListener('click', () => {
+            if(confirm('정말로 모든 데이터를 지우고 처음부터 다시 시작할까요?\n(확인을 누르면 모든 내역이 0원으로 초기화됩니다)')) {
+                localStorage.clear();
+                localStorage.setItem('initialized', 'true'); // 재접속시 랜덤 데이터 생성 막기
+                location.reload();
+            }
+        });
+
+        // ================= AI 챗봇 (돈토리 페르소나 수정) =================
+        const chatBtn = document.getElementById('chatbot-btn');
+        const chatWindow = document.getElementById('chatbot-window');
+        const chatClose = document.getElementById('chatbot-close');
+        const chatInput = document.getElementById('chat-input');
+        const chatSend = document.getElementById('chat-send');
+        const chatMessages = document.getElementById('chat-messages');
+
+        chatBtn.addEventListener('click', () => chatWindow.classList.remove('hidden'));
+        chatClose.addEventListener('click', () => chatWindow.classList.add('hidden'));
+
+        function getCurrentFinancialContext() {
+            const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+            const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+            const currentBalance = totalIncome - totalExpense;
+
+            const currentMonthTxs = getCurrentMonthTransactions();
+            const monthExpense = currentMonthTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+            
+            const catSums = {};
+            currentMonthTxs.filter(t => t.type === 'expense' && t.category !== '저축').forEach(t => { catSums[t.category] = (catSums[t.category] || 0) + t.amount; });
+            const sortedCats = Object.keys(catSums).sort((a,b) => catSums[b] - catSums[a]);
+            const topCat = sortedCats.length > 0 ? `${sortedCats[0]}(${catSums[sortedCats[0]]}원)` : '없음';
+
+            return `[사용자 상태] 현재 남은돈: ${currentBalance}원, 이번 달 지출: ${monthExpense}원, 이번 달 1위지출: ${topCat}`;
+        }
+
+        function appendMessage(sender, text) {
+            const msgDiv = document.createElement('div');
+            const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            if (sender === 'user') {
+                msgDiv.className = `p-3 rounded-2xl max-w-[85%] bg-gray-800 text-white self-end rounded-tr-none shadow-sm`;
+            } else {
+                msgDiv.className = `p-3 rounded-2xl max-w-[85%] bg-white text-gray-800 self-start rounded-tl-none shadow-sm border border-gray-200 leading-relaxed`;
+            }
+            msgDiv.innerHTML = formattedText;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Gemini API 호출 
+        async function getGeminiResponse(userMessage) {
+            const context = getCurrentFinancialContext();
+            
+            const systemPrompt = `너는 고등학생 사용자들의 친근하고 똑똑한 또래 금융 조언자 '돈토리'야. 
+            다음은 사용자의 가계부 데이터야: ${context}
+            이 데이터를 바탕으로 질문에 답해줘.
+            
+            말투 규칙:
+            1. 평범한 10대들이 카톡할 때 쓰는 다정하고 편한 반말을 써줘.
+            2. 무례하거나 너무 공격적인 팩폭은 피하고, '현실적이지만 따뜻한 조언'을 해줘.
+            3. 모바일에서 읽기 편하게 2~3문장 이내로 아주 짧게 대답해.`;
+
+            // API 호출 부분 수정
+            try {
+                // v1beta 사용
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+                
+                const requestBody = {
+                    contents: [
+                        { 
+                            parts: [
+                                { text: systemPrompt + "\n\n사용자: " + userMessage }
+                            ]
+                        }
+                    ]
+                };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if(!response.ok) {
+                    const errorText = await response.text();
+                    console.error("API Error Response:", errorText);
+                    throw new Error(`API 에러 (${response.status})`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts.length > 0) {
+                    return data.candidates[0].content.parts[0].text;
+                } else {
+                     throw new Error("API 응답 형식이 올바르지 않습니다.");
+                }
+                
+            } catch (error) {
+                console.error("Gemini API 호출 실패:", error);
+                return "앗, 지금 통신 상태가 조금 불안정해. 잠시 후에 다시 말해줄래? 🥲"; 
+            }
+        }
+
+        chatSend.addEventListener('click', async () => {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            appendMessage('user', text); chatInput.value = '';
+            appendMessage('ai', '타이핑 중... 👀');
+            const aiResponse = await getGeminiResponse(text);
+            chatMessages.lastChild.remove(); 
+            appendMessage('ai', aiResponse);
+        });
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') chatSend.click(); });
+
+        // 초기 화면 업데이트 세팅
+        updateDashboard(); 
+        updateSelectOptions();
+    </script>
+</body>
+</html>
