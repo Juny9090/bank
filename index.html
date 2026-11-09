@@ -708,9 +708,7 @@ html_code = r"""<!DOCTYPE html>
                     score -= 20; feedback.push("🚨 이번 달은 저축을 전혀 하지 않았네요. 비상금이 없으면 나중에 꼭 후회하게 돼요!");
                 }
             } else {
-                 if (totalExpense > 0) {
-                    feedback.push("⚠️ 설정된 예산(용돈)이 0원인데 지출이 발생했어요. 예산 설정을 확인해주세요.");
-                 } else if (currentBalance >= 0) {
+                 if (currentBalance >= 0 && totalExpense === 0) {
                     feedback.push("💡 아직 등록된 지출 내역이 없습니다.");
                  }
             }
@@ -1099,4 +1097,4 @@ html_code = r"""<!DOCTYPE html>
 </html>"""
 
 with open("index.html", "w", encoding="utf-8") as f:
-    f.write(code.strip())
+    f.write(html_code.strip())
