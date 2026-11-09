@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write("""<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -14,9 +15,6 @@
         .tab-content.active { display: block; }
         .bottom-nav-item.active-text { color: #3b82f6; }
         .category-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-        
-        #chat-messages::-webkit-scrollbar { width: 6px; }
-        #chat-messages::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
         
         /* 홈 중앙 버튼 애니메이션 */
         .home-fab { box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39); }
@@ -342,29 +340,6 @@
         </div>
     </div>
 
-    <!-- AI 챗봇 (돈토리) -->
-    <button id="chatbot-btn" class="fixed bottom-28 right-4 bg-white border border-gray-200 text-3xl p-3 rounded-full shadow-lg hover:shadow-xl transition-transform hover:-translate-y-1 z-40 w-14 h-14 flex items-center justify-center">
-        💬
-    </button>
-
-    <div id="chatbot-window" class="fixed bottom-28 right-4 w-[90%] max-w-[340px] bg-white rounded-2xl shadow-2xl border border-gray-200 hidden z-50 flex flex-col overflow-hidden origin-bottom-right transition-all">
-        <div class="bg-gray-800 text-white p-4 font-bold flex justify-between items-center">
-            <span class="flex items-center gap-2 text-lg">💬 돈토리</span>
-            <button id="chatbot-close" class="hover:text-gray-300 transition-colors"><i class="fas fa-times text-xl"></i></button>
-        </div>
-        
-        <div id="chat-messages" class="h-72 p-4 overflow-y-auto bg-gray-50 flex flex-col gap-3 text-sm">
-            <div class="bg-white text-gray-800 p-3 rounded-2xl rounded-tl-none self-start max-w-[85%] shadow-sm border border-gray-200 leading-relaxed">
-                안녕! 이번 달 지갑 상태 어때? 💸<br>소비 습관이나 살까 말까 고민되는 게 있으면 편하게 물어봐. 다정하게 조언해 줄게!
-            </div>
-        </div>
-        
-        <div class="p-3 bg-white border-t border-gray-100 flex gap-2 items-center">
-            <input type="text" id="chat-input" class="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-400 transition-all" placeholder="이번 달 저축 잘하고 있어?">
-            <button id="chat-send" class="bg-gray-800 text-white w-10 h-10 rounded-full shadow hover:bg-gray-900 flex items-center justify-center transition-colors"><i class="fas fa-paper-plane text-xs relative right-[1px]"></i></button>
-        </div>
-    </div>
-
     <!-- 하단 네비게이션 바 (가운데 돋보이는 홈 버튼 적용) -->
     <nav class="fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-between items-center px-4 pb-4 pt-3 z-30 max-w-md left-1/2 transform -translate-x-1/2 rounded-t-3xl shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)]">
         <button class="bottom-nav-item flex flex-col items-center gap-1 w-[18%] text-gray-400 transition-colors" data-target="calendar">
@@ -390,9 +365,6 @@
     </nav>
 
     <script>
-        // 1. 유효한 API 키 적용 완료
-        const GEMINI_API_KEY = "AQ.Ab8RN6ItDAAjqN9NDWTwNgMqM1hvQimqEqFlp46p7bewn1iheA"; 
-
         const defaultExpenseCats = [
             { name: '식비', icon: '🍚', color: 'bg-orange-100 text-orange-500' },
             { name: '간식·카페', icon: '☕', color: 'bg-yellow-100 text-yellow-600' },
@@ -1102,123 +1074,18 @@
             }
         });
 
-        // ================= 데이터 초기화 버그 해결 =================
+        // ================= 데이터 초기화 =================
         document.getElementById('reset-data-btn').addEventListener('click', () => {
-            if(confirm('정말로 모든 데이터를 지우고 처음부터 다시 시작할까요?\n(확인을 누르면 모든 내역이 0원으로 초기화됩니다)')) {
+            if(confirm('정말로 모든 데이터를 지우고 처음부터 다시 시작할까요?\\n(확인을 누르면 모든 내역이 0원으로 초기화됩니다)')) {
                 localStorage.clear();
-                localStorage.setItem('initialized', 'true'); // 재접속시 랜덤 데이터 생성 막기
+                localStorage.setItem('initialized', 'true'); 
                 location.reload();
             }
         });
-
-        // ================= AI 챗봇 (돈토리 페르소나 수정) =================
-        const chatBtn = document.getElementById('chatbot-btn');
-        const chatWindow = document.getElementById('chatbot-window');
-        const chatClose = document.getElementById('chatbot-close');
-        const chatInput = document.getElementById('chat-input');
-        const chatSend = document.getElementById('chat-send');
-        const chatMessages = document.getElementById('chat-messages');
-
-        chatBtn.addEventListener('click', () => chatWindow.classList.remove('hidden'));
-        chatClose.addEventListener('click', () => chatWindow.classList.add('hidden'));
-
-        function getCurrentFinancialContext() {
-            const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-            const totalExpense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-            const currentBalance = totalIncome - totalExpense;
-
-            const currentMonthTxs = getCurrentMonthTransactions();
-            const monthExpense = currentMonthTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-            
-            const catSums = {};
-            currentMonthTxs.filter(t => t.type === 'expense' && t.category !== '저축').forEach(t => { catSums[t.category] = (catSums[t.category] || 0) + t.amount; });
-            const sortedCats = Object.keys(catSums).sort((a,b) => catSums[b] - catSums[a]);
-            const topCat = sortedCats.length > 0 ? `${sortedCats[0]}(${catSums[sortedCats[0]]}원)` : '없음';
-
-            return `[사용자 상태] 현재 남은돈: ${currentBalance}원, 이번 달 지출: ${monthExpense}원, 이번 달 1위지출: ${topCat}`;
-        }
-
-        function appendMessage(sender, text) {
-            const msgDiv = document.createElement('div');
-            const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-            if (sender === 'user') {
-                msgDiv.className = `p-3 rounded-2xl max-w-[85%] bg-gray-800 text-white self-end rounded-tr-none shadow-sm`;
-            } else {
-                msgDiv.className = `p-3 rounded-2xl max-w-[85%] bg-white text-gray-800 self-start rounded-tl-none shadow-sm border border-gray-200 leading-relaxed`;
-            }
-            msgDiv.innerHTML = formattedText;
-            chatMessages.appendChild(msgDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        // Gemini API 호출 
-        async function getGeminiResponse(userMessage) {
-            const context = getCurrentFinancialContext();
-            
-            const systemPrompt = `너는 고등학생 사용자들의 친근하고 똑똑한 또래 금융 조언자 '돈토리'야. 
-            다음은 사용자의 가계부 데이터야: ${context}
-            이 데이터를 바탕으로 질문에 답해줘.
-            
-            말투 규칙:
-            1. 평범한 10대들이 카톡할 때 쓰는 다정하고 편한 반말을 써줘.
-            2. 무례하거나 너무 공격적인 팩폭은 피하고, '현실적이지만 따뜻한 조언'을 해줘.
-            3. 모바일에서 읽기 편하게 2~3문장 이내로 아주 짧게 대답해.`;
-
-            // API 호출 부분 수정
-            try {
-                // v1beta 사용
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-                
-                const requestBody = {
-                    contents: [
-                        { 
-                            parts: [
-                                { text: systemPrompt + "\n\n사용자: " + userMessage }
-                            ]
-                        }
-                    ]
-                };
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                if(!response.ok) {
-                    const errorText = await response.text();
-                    console.error("API Error Response:", errorText);
-                    throw new Error(`API 에러 (${response.status})`);
-                }
-                
-                const data = await response.json();
-                
-                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts.length > 0) {
-                    return data.candidates[0].content.parts[0].text;
-                } else {
-                     throw new Error("API 응답 형식이 올바르지 않습니다.");
-                }
-                
-            } catch (error) {
-                console.error("Gemini API 호출 실패:", error);
-                return "앗, 지금 통신 상태가 조금 불안정해. 잠시 후에 다시 말해줄래? 🥲"; 
-            }
-        }
-
-        chatSend.addEventListener('click', async () => {
-            const text = chatInput.value.trim();
-            if (!text) return;
-            appendMessage('user', text); chatInput.value = '';
-            appendMessage('ai', '타이핑 중... 👀');
-            const aiResponse = await getGeminiResponse(text);
-            chatMessages.lastChild.remove(); 
-            appendMessage('ai', aiResponse);
-        });
-        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') chatSend.click(); });
 
         // 초기 화면 업데이트 세팅
         updateDashboard(); 
         updateSelectOptions();
     </script>
 </body>
-</html>
+</html>""")
