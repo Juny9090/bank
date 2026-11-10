@@ -448,6 +448,35 @@
             });
         });
 
+        // 사용자 입력은 HTML/속성에 넣기 전에 이스케이프합니다.
+        function escapeHTML(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        function isValidDate(value) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+            const date = new Date(`${value}T00:00:00`);
+            return !Number.isNaN(date.getTime()) && getLocalDateString(date) === value;
+        }
+
+        function validateTransaction(amount, date, category) {
+            if (!Number.isSafeInteger(amount) || amount <= 0) {
+                alert('금액은 1원 이상의 정수로 입력해주세요.');
+                return false;
+            }
+            if (!isValidDate(date)) {
+                alert('올바른 날짜를 입력해주세요.');
+                return false;
+            }
+            if (!category) {
+                alert('카테고리를 선택해주세요.');
+                return false;
+            }
+            return true;
+        }
+
         // 기타 헬퍼 함수들
         function getCategoryData(type, name) {
             const list = type === 'expense' ? expenseCategories : incomeCategories;
@@ -467,7 +496,7 @@
 
         function getFilteredTransactions(periodStr) {
             if (periodStr === 'all') return transactions;
-            const cutoff = getCutoffDate(periodStr).toISOString().split('T')[0];
+            const cutoff = getLocalDateString(getCutoffDate(periodStr));
             return transactions.filter(t => t.date >= cutoff);
         }
 
@@ -552,10 +581,10 @@
                     recentContainer.innerHTML += `
                         <div class="flex justify-between items-center border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                             <div class="flex items-center gap-3">
-                                <div class="category-icon ${catData.color} text-lg">${catData.icon}</div>
+                                <div class="category-icon ${catData.color} text-lg">${escapeHTML(catData.icon)}</div>
                                 <div>
-                                    <p class="font-bold text-sm text-gray-800">${t.category}</p>
-                                    <p class="text-[11px] text-gray-400">${t.date} ${t.memo ? `· ${t.memo}` : ''}</p>
+                                    <p class="font-bold text-sm text-gray-800">${escapeHTML(t.category)}</p>
+                                    <p class="text-[11px] text-gray-400">${escapeHTML(t.date)} ${t.memo ? `· ${escapeHTML(t.memo)}` : ''}</p>
                                 </div>
                             </div>
                             <span class="font-bold text-sm ${t.type === 'expense' ? 'text-gray-800' : 'text-blue-500'}">
@@ -596,7 +625,7 @@
                 if(inSum > 0) badgeHTML += `<div class="text-[9px] text-blue-500 font-bold leading-tight mt-0.5">+${(inSum/10000).toFixed(1).replace('.0','')}만</div>`;
                 if(outSum > 0) badgeHTML += `<div class="text-[9px] text-red-500 font-bold leading-tight mt-0.5">-${(outSum/10000).toFixed(1).replace('.0','')}만</div>`;
                 
-                const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                const isToday = getLocalDateString(new Date()) === dateStr;
                 
                 grid.innerHTML += `
                     <div class="min-h-[55px] p-1 border border-gray-100 rounded-lg flex flex-col items-center cursor-pointer hover:bg-gray-50 transition-colors ${isToday ? 'ring-2 ring-blue-400 bg-blue-50' : 'bg-white'}" onclick="showDayDetails('${dateStr}')">
@@ -624,8 +653,8 @@
                     list.innerHTML += `
                         <div class="flex justify-between items-center text-sm border-b border-gray-50 pb-2 last:border-0 last:pb-0">
                             <div class="flex items-center gap-2">
-                                <span class="bg-gray-100 rounded-full w-6 h-6 flex justify-center items-center text-xs">${catData.icon}</span>
-                                <span class="text-gray-700 font-medium">${t.category} ${t.memo ? `<span class="text-gray-400 text-xs font-normal">(${t.memo})</span>` : ''}</span>
+                                <span class="bg-gray-100 rounded-full w-6 h-6 flex justify-center items-center text-xs">${escapeHTML(catData.icon)}</span>
+                                <span class="text-gray-700 font-medium">${escapeHTML(t.category)} ${t.memo ? `<span class="text-gray-400 text-xs font-normal">(${escapeHTML(t.memo)})</span>` : ''}</span>
                             </div>
                             <span class="font-bold ${isExp ? 'text-red-500' : 'text-blue-500'}">${isExp ? '-' : '+'}${t.amount.toLocaleString()}원</span>
                         </div>
@@ -634,22 +663,23 @@
             }
         };
 
-        document.getElementById('cal-prev').addEventListener('click', () => { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); });
-        document.getElementById('cal-next').addEventListener('click', () => { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); });
+        document.getElementById('cal-prev').addEventListener('click', () => { currentCalDate = new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() - 1, 1); renderCalendar(); });
+        document.getElementById('cal-next').addEventListener('click', () => { currentCalDate = new Date(currentCalDate.getFullYear(), currentCalDate.getMonth() + 1, 1); renderCalendar(); });
 
         // ================= 추가 탭 =================
         let currentAddType = 'expense';
-        document.getElementById('add-date').valueAsDate = new Date();
+        document.getElementById('add-date').value = getLocalDateString(new Date());
 
         function renderAddCategoryGrid() {
             const grid = document.getElementById('category-grid');
             grid.innerHTML = '';
+            document.getElementById('add-category').value = '';
             const list = currentAddType === 'expense' ? expenseCategories : incomeCategories;
             
             list.forEach((cat, index) => {
                 const btn = document.createElement('button');
                 btn.className = `p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${index === 0 ? cat.color + ' ring-2 ring-blue-400 scale-105 shadow-sm' : 'bg-gray-50 text-gray-400'}`;
-                btn.innerHTML = `<span class="text-2xl mb-1">${cat.icon}</span><span class="text-[10px] font-bold">${cat.name}</span>`;
+                btn.innerHTML = `<span class="text-2xl mb-1">${escapeHTML(cat.icon)}</span><span class="text-[10px] font-bold">${escapeHTML(cat.name)}</span>`;
                 if (index === 0) document.getElementById('add-category').value = cat.name;
 
                 btn.onclick = () => {
@@ -677,8 +707,10 @@
         });
 
         document.getElementById('btn-save').addEventListener('click', () => {
-            const amount = parseInt(document.getElementById('add-amount').value);
-            if(!amount) return alert('금액을 입력해주세요!');
+            const amount = Number(document.getElementById('add-amount').value);
+            const date = document.getElementById('add-date').value;
+            const category = document.getElementById('add-category').value;
+            if (!validateTransaction(amount, date, category)) return;
             
             transactions.push({
                 id: Date.now(), type: currentAddType, amount: amount,
@@ -705,7 +737,7 @@
             const totalExpense = expenseTxs.reduce((sum, t) => sum + t.amount, 0);
             const savedAmount = expenseTxs.filter(t => t.category === '저축').reduce((sum, t) => sum + t.amount, 0);
             
-            const catSums = {};
+            const catSums = Object.create(null);
             expenseTxs.forEach(t => { if(t.category !== '저축') catSums[t.category] = (catSums[t.category] || 0) + t.amount; });
             const maxCatAmount = Math.max(0, ...Object.values(catSums));
             const topCat = Object.keys(catSums).find(k => catSums[k] === maxCatAmount);
@@ -766,7 +798,7 @@
             const feedbackEl = document.getElementById('score-feedback');
             feedbackEl.innerHTML = '';
             feedback.forEach(text => {
-                feedbackEl.innerHTML += `<li>${text}</li>`;
+                feedbackEl.innerHTML += `<li>${escapeHTML(text)}</li>`;
             });
         }
 
@@ -786,7 +818,7 @@
             const filteredTxs = getFilteredTransactions(currentChartPeriod);
             const expenseTxs = filteredTxs.filter(t => t.type === 'expense');
 
-            const catData = {};
+            const catData = Object.create(null);
             expenseTxs.forEach(t => { catData[t.category] = (catData[t.category] || 0) + t.amount; });
             const sortedCats = Object.keys(catData).sort((a,b) => catData[b] - catData[a]);
             const top1 = sortedCats.length > 0 ? sortedCats[0] : '내역 없음';
@@ -845,7 +877,7 @@
                 dailyBalances[t.date] = runningBal; 
             });
 
-            const cutoffStr = getCutoffDate(currentChartPeriod).toISOString().split('T')[0];
+            const cutoffStr = getLocalDateString(getCutoffDate(currentChartPeriod));
             const labels = []; const dataPoints = [];
 
             Object.keys(dailyBalances).sort().forEach(date => {
@@ -887,11 +919,11 @@
         document.getElementById('settings-allowance-date').value = allowanceDate;
         
         document.getElementById('btn-save-allowance').addEventListener('click', () => {
-            const amt = parseInt(document.getElementById('settings-allowance').value) || 0;
-            const dateVal = parseInt(document.getElementById('settings-allowance-date').value) || 1;
-            if (dateVal < 1 || dateVal > 31) return alert("날짜는 1일에서 31일 사이로 입력해주세요.");
+            const amt = Number(document.getElementById('settings-allowance').value);
+            const dateVal = Number(document.getElementById('settings-allowance-date').value);
+            if (!Number.isInteger(dateVal) || dateVal < 1 || dateVal > 31) return alert("날짜는 1일에서 31일 사이로 입력해주세요.");
             
-            if (amt < 0) return alert('용돈은 0원 이상으로 입력해주세요.');
+            if (!Number.isSafeInteger(amt) || amt < 0) return alert('용돈은 0원 이상의 정수로 입력해주세요.');
             // 금액이나 날짜를 새로 저장하면 오늘부터 적용합니다.
             // 이미 이번 달 자동 지급이 있었다면 지급 기록은 유지합니다.
             allowanceAmount = amt;
@@ -929,8 +961,8 @@
             list.forEach(cat => {
                 container.innerHTML += `
                     <div class="flex items-center gap-1 bg-white border border-gray-200 px-3 py-1.5 rounded-full text-sm">
-                        <span>${cat.icon} ${cat.name}</span>
-                        <button onclick="deleteCategory('${cat.name}')" class="text-gray-400 hover:text-red-500 ml-1 focus:outline-none"><i class="fas fa-times"></i></button>
+                        <span>${escapeHTML(cat.icon)} ${escapeHTML(cat.name)}</span>
+                        <button onclick="deleteCategory(${escapeHTML(JSON.stringify(cat.name))})" class="text-gray-400 hover:text-red-500 ml-1 focus:outline-none"><i class="fas fa-times"></i></button>
                     </div>
                 `;
             });
@@ -949,6 +981,8 @@
             const emoji = document.getElementById('new-cat-emoji').value.trim() || '📌';
             
             if(!name) return alert('카테고리 이름을 입력해주세요.');
+            const list = currentCatManageType === 'expense' ? expenseCategories : incomeCategories;
+            if (list.some(cat => cat.name === name)) return alert('이미 있는 카테고리입니다.');
             
             const newCat = { name, icon: emoji, color: 'bg-gray-100 text-gray-700' };
             if (currentCatManageType === 'expense') expenseCategories.push(newCat);
@@ -967,7 +1001,7 @@
         function updateSelectOptions() {
             const filterSelect = document.getElementById('filter-category');
             filterSelect.innerHTML = '<option value="all">전체 카테고리 (지출)</option>';
-            expenseCategories.forEach(c => { filterSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`; });
+            expenseCategories.forEach(c => { filterSelect.innerHTML += `<option value="${escapeHTML(c.name)}">${escapeHTML(c.name)}</option>`; });
         }
 
         document.getElementById('btn-search-history').addEventListener('click', () => {
@@ -993,8 +1027,8 @@
                     listContainer.innerHTML += `
                         <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                             <div>
-                                <p class="font-bold text-sm text-gray-700">${t.category}</p>
-                                <p class="text-xs text-gray-400">${t.date} ${t.memo ? `· ${t.memo}` : ''}</p>
+                                <p class="font-bold text-sm text-gray-700">${escapeHTML(t.category)}</p>
+                                <p class="text-xs text-gray-400">${escapeHTML(t.date)} ${t.memo ? `· ${escapeHTML(t.memo)}` : ''}</p>
                             </div>
                             <span class="font-bold text-sm text-gray-800">-${t.amount.toLocaleString()}원</span>
                         </div>
@@ -1031,10 +1065,10 @@
                 list.innerHTML += `
                     <div class="flex justify-between items-center border-b border-gray-100 py-4">
                         <div class="flex items-center gap-3">
-                            <div class="category-icon ${catData.color} text-lg">${catData.icon}</div>
+                            <div class="category-icon ${catData.color} text-lg">${escapeHTML(catData.icon)}</div>
                             <div>
-                                <p class="font-bold text-gray-800">${t.category}</p>
-                                <p class="text-xs text-gray-400">${t.date} ${t.memo ? `· ${t.memo}` : ''}</p>
+                                <p class="font-bold text-gray-800">${escapeHTML(t.category)}</p>
+                                <p class="text-xs text-gray-400">${escapeHTML(t.date)} ${t.memo ? `· ${escapeHTML(t.memo)}` : ''}</p>
                             </div>
                         </div>
                         <div class="text-right">
@@ -1068,7 +1102,7 @@
         function updateEditCategoryOptions(type) {
             editCategorySelect.innerHTML = '';
             const list = type === 'expense' ? expenseCategories : incomeCategories;
-            list.forEach(c => { editCategorySelect.innerHTML += `<option value="${c.name}">${c.name}</option>`; });
+            list.forEach(c => { editCategorySelect.innerHTML += `<option value="${escapeHTML(c.name)}">${escapeHTML(c.name)}</option>`; });
         }
 
         document.getElementById('edit-type-expense').addEventListener('click', (e) => {
@@ -1095,18 +1129,25 @@
             if(t.type === 'expense') document.getElementById('edit-type-expense').click();
             else document.getElementById('edit-type-income').click();
             
-            setTimeout(() => { editCategorySelect.value = t.category; }, 10);
+            if (![...editCategorySelect.options].some(option => option.value === t.category)) {
+                editCategorySelect.add(new Option(t.category, t.category));
+            }
+            editCategorySelect.value = t.category;
             modalEdit.classList.remove('hidden');
         };
 
         document.getElementById('btn-edit-cancel').addEventListener('click', () => { modalEdit.classList.add('hidden'); });
         document.getElementById('btn-edit-save').addEventListener('click', () => {
-            const id = parseInt(document.getElementById('edit-id').value);
+            const id = Number(document.getElementById('edit-id').value);
+            const amount = Number(document.getElementById('edit-amount').value);
+            const date = document.getElementById('edit-date').value;
+            const category = editCategorySelect.value;
+            if (!validateTransaction(amount, date, category)) return;
             const index = transactions.findIndex(x => x.id === id);
             if(index > -1) {
                 transactions[index].type = editTypeInput.value;
                 transactions[index].date = document.getElementById('edit-date').value;
-                transactions[index].amount = parseInt(document.getElementById('edit-amount').value);
+                transactions[index].amount = amount;
                 transactions[index].memo = document.getElementById('edit-memo').value;
                 transactions[index].category = editCategorySelect.value;
                 saveData(); modalEdit.classList.add('hidden'); renderAllTransactions(); updateDashboard();
