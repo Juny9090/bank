@@ -127,6 +127,19 @@
         <!-- ==================== 분석 탭 ==================== -->
         <section id="tab-analysis" class="tab-content space-y-6">
             <h2 class="text-2xl font-bold mb-2">소비 분석</h2>
+
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-blue-100 space-y-3">
+                <h3 class="font-bold text-lg">✨ AI 소비 코치</h3>
+                <p class="text-sm text-gray-500">이번 달 소비를 살펴보고 실천할 방법을 제안해 드려요. 기존 소비 점수와 별도로 제공되는 AI 조언이에요.</p>
+                <label class="flex items-start gap-2 text-xs text-gray-500 leading-relaxed">
+                    <input id="ai-consent" type="checkbox" class="mt-1">
+                    <span>분석을 위해 이번 달 수입·지출·카테고리별 합계, 기본 용돈, 전체 잔액을 OpenAI에 전송하는 데 동의합니다. 메모와 개별 거래 내역은 보내지 않습니다.</span>
+                </label>
+                <button id="btn-ai-analyze" class="w-full bg-blue-500 text-white font-bold py-3 rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">이번 달 AI 분석하기</button>
+                <p id="ai-status" class="text-xs text-gray-500" role="status" aria-live="polite"></p>
+                <div id="ai-answer" class="hidden bg-blue-50 p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap break-words" aria-live="polite"></div>
+                <p class="text-xs text-gray-400">AI 조언에는 오류가 있을 수 있어요. 거래 내역과 함께 확인해주세요.</p>
+            </div>
             
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <div class="flex justify-between items-center mb-4">
@@ -723,6 +736,89 @@
             document.getElementById('add-amount').value = '';
             document.getElementById('add-memo').value = '';
             document.querySelector('.bottom-nav-item[data-target="dashboard"]').click();
+        });
+
+        // ================= AI 소비 분석 =================
+        let aiBusy = false;
+        let aiLastRequestAt = 0;
+        let aiCachedKey = '';
+        let aiCachedAnswer = '';
+
+        function buildAISummary() {
+            const now = new Date();
+            const today = getLocalDateString(now);
+            const month = today.slice(0, 7);
+            // 미래 날짜로 입력한 기록은 오늘의 사용 가능액에 포함하지 않습니다.
+            const valid = transactions.filter(t => ['income', 'expense'].includes(t.type) &&
+                Number.isSafeInteger(t.amount) && t.amount > 0 && isValidDate(t.date) && t.date <= today);
+            const current = valid.filter(t => t.date.startsWith(month));
+            const sums = Object.create(null);
+            current.filter(t => t.type === 'expense').forEach(t => {
+                const name = t.category || '기타';
+                sums[name] = (sums[name] || 0) + t.amount;
+            });
+            const total = (list, type) => list.filter(t => t.type === type).reduce((sum, t) => sum + t.amount, 0);
+            return { month, income: total(current, 'income'), expense: total(current, 'expense'),
+                balance: total(valid, 'income') - total(valid, 'expense'), allowance: allowanceAmount,
+                daysRemaining: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1,
+                count: current.length,
+                categories: Object.entries(sums).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount) };
+        }
+
+        document.getElementById('btn-ai-analyze').addEventListener('click', async () => {
+            if (aiBusy) return;
+            const status = document.getElementById('ai-status');
+            const answer = document.getElementById('ai-answer');
+            if (!document.getElementById('ai-consent').checked) {
+                status.textContent = '전송 항목을 확인하고 동의에 체크해주세요.';
+                return;
+            }
+            checkAndInjectAllowance();
+            const summary = buildAISummary();
+            if (!summary.count) {
+                answer.classList.add('hidden');
+                status.textContent = '이번 달 수입이나 지출을 먼저 기록해주세요.';
+                return;
+            }
+            const key = JSON.stringify(summary);
+            if (key === aiCachedKey && aiCachedAnswer) {
+                answer.textContent = aiCachedAnswer;
+                answer.classList.remove('hidden');
+                status.textContent = '같은 내역으로 분석한 결과입니다. 추가 요청 없이 보여드려요.';
+                return;
+            }
+            if (Date.now() - aiLastRequestAt < 60000) {
+                status.textContent = '마지막 요청에서 1분 후 다시 분석할 수 있어요.';
+                return;
+            }
+            aiBusy = true;
+            aiLastRequestAt = Date.now();
+            const button = document.getElementById('btn-ai-analyze');
+            button.disabled = true;
+            button.textContent = '소비 내역 분석 중…';
+            answer.classList.add('hidden');
+            status.textContent = 'AI가 소비 집계를 살펴보고 있어요.';
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: key, signal: AbortSignal.timeout(35000)
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.error || 'AI에 연결하지 못했어요. Vercel 사이트에서 다시 시도해주세요.');
+                if (typeof data.answer !== 'string' || !data.answer.trim()) throw new Error('분석 결과가 비어 있어요. 다시 시도해주세요.');
+                aiCachedKey = key;
+                aiCachedAnswer = data.answer;
+                answer.textContent = data.answer;
+                answer.classList.remove('hidden');
+                status.textContent = '분석 완료 · 오늘까지 입력한 기록 기준이에요.';
+            } catch (error) {
+                status.textContent = error.name === 'TimeoutError' || error.name === 'AbortError'
+                    ? '응답이 늦어지고 있어요. 잠시 후 다시 시도해주세요.' : error.message;
+            } finally {
+                aiBusy = false;
+                button.disabled = false;
+                button.textContent = '이번 달 AI 분석하기';
+            }
         });
 
         // ================= 분석 탭 =================
