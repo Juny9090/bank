@@ -387,6 +387,9 @@
         let incomeCategories = JSON.parse(localStorage.getItem('incomeCats')) || defaultIncomeCats;
         let allowanceAmount = parseInt(localStorage.getItem('allowanceAmount')) || 0; // 초기 용돈 0원으로 설정
         let allowanceDate = parseInt(localStorage.getItem('allowanceDate')) || 1;
+        // 설정일과 마지막 자동 지급 월을 별도로 저장해 중복 지급을 막습니다.
+        let allowanceStartDate = localStorage.getItem('allowanceStartDate');
+        let allowanceLastPaidMonth = localStorage.getItem('allowanceLastPaidMonth');
         let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
         
         let chartInstances = {};
@@ -397,6 +400,8 @@
             localStorage.setItem('transactions', JSON.stringify(transactions));
             localStorage.setItem('allowanceAmount', allowanceAmount.toString());
             localStorage.setItem('allowanceDate', allowanceDate.toString());
+            if (allowanceStartDate) localStorage.setItem('allowanceStartDate', allowanceStartDate);
+            if (allowanceLastPaidMonth) localStorage.setItem('allowanceLastPaidMonth', allowanceLastPaidMonth);
             localStorage.setItem('expenseCats', JSON.stringify(expenseCategories));
             localStorage.setItem('incomeCats', JSON.stringify(incomeCategories));
         }
@@ -472,26 +477,50 @@
             return transactions.filter(t => t.date.startsWith(currentMonth));
         }
 
-        function checkAndInjectAllowance() {
-            const now = new Date();
-            const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            
-            // 용돈이 0원보다 클 때만 자동 입력
-            if (allowanceAmount > 0 && now.getDate() >= allowanceDate) {
-                const hasAllowance = transactions.some(t => 
-                    t.type === 'income' && t.category === '용돈' && t.date.startsWith(currentYearMonth)
-                );
+        function getLocalDateString(date) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
 
-                if (!hasAllowance) {
-                    const injectDate = new Date(now.getFullYear(), now.getMonth(), allowanceDate);
-                    transactions.push({
-                        id: Date.now() + Math.random(),
-                        type: 'income', amount: allowanceAmount, category: '용돈',
-                        date: injectDate.toISOString().split('T')[0], memo: '정기 용돈 (자동입력)'
-                    });
-                    saveData();
-                }
+        // 이전 버전에서 저장한 용돈 설정도 새 방식으로 안전하게 전환합니다.
+        // 설정 시점을 알 수 없으므로, 기존 설정은 오늘부터 적용합니다.
+        if (allowanceAmount > 0 && !allowanceStartDate) {
+            allowanceStartDate = getLocalDateString(new Date());
+            const previousAuto = transactions
+                .filter(t => t.type === 'income' && t.memo === '정기 용돈 (자동입력)')
+                .map(t => t.date.slice(0, 7)).sort();
+            if (previousAuto.length && !allowanceLastPaidMonth) {
+                allowanceLastPaidMonth = previousAuto[previousAuto.length - 1];
             }
+            saveData();
+        }
+
+        function checkAndInjectAllowance() {
+            if (allowanceAmount <= 0 || !allowanceStartDate) return;
+
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const yearMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+            const payday = Math.min(allowanceDate, new Date(year, month + 1, 0).getDate());
+            const dueDate = `${yearMonth}-${String(payday).padStart(2, '0')}`;
+            const today = getLocalDateString(now);
+
+            // 설정일 이후에 도래한 지급일에만, 한 달에 한 번 지급합니다.
+            if (today < dueDate || allowanceStartDate > dueDate || allowanceLastPaidMonth === yearMonth) return;
+
+            // 이전 기록이 존재하면 또 지급하지 않습니다 (수동으로 추가한 용돈은 제외).
+            const alreadyPaid = transactions.some(t =>
+                t.type === 'income' && t.memo === '정기 용돈 (자동입력)' && t.date.slice(0, 7) === yearMonth
+            );
+            if (!alreadyPaid) {
+                transactions.push({
+                    id: Date.now() + Math.random(),
+                    type: 'income', amount: allowanceAmount, category: '용돈',
+                    date: dueDate, memo: '정기 용돈 (자동입력)'
+                });
+            }
+            allowanceLastPaidMonth = yearMonth;
+            saveData();
         }
 
         // ================= 대시보드 =================
@@ -862,8 +891,12 @@
             const dateVal = parseInt(document.getElementById('settings-allowance-date').value) || 1;
             if (dateVal < 1 || dateVal > 31) return alert("날짜는 1일에서 31일 사이로 입력해주세요.");
             
+            if (amt < 0) return alert('용돈은 0원 이상으로 입력해주세요.');
+            // 금액이나 날짜를 새로 저장하면 오늘부터 적용합니다.
+            // 이미 이번 달 자동 지급이 있었다면 지급 기록은 유지합니다.
             allowanceAmount = amt;
             allowanceDate = dateVal;
+            allowanceStartDate = getLocalDateString(new Date());
             saveData(); 
             checkAndInjectAllowance();
             updateDashboard();
