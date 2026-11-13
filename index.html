@@ -128,19 +128,30 @@
         <section id="tab-analysis" class="tab-content space-y-6">
             <h2 class="text-2xl font-bold mb-2">소비 분석</h2>
 
-            <div class="bg-white rounded-2xl p-5 shadow-sm border border-blue-100 space-y-3">
-                <h3 class="font-bold text-lg">✨ AI 소비 코치</h3>
-                <p class="text-sm text-gray-500">이번 달 소비를 살펴보고 실천할 방법을 제안해 드려요. 기존 소비 점수와 별도로 제공되는 AI 조언이에요.</p>
-                <label class="flex items-start gap-2 text-xs text-gray-500 leading-relaxed">
-                    <input id="ai-consent" type="checkbox" class="mt-1">
-                    <span>분석을 위해 이번 달 수입·지출·카테고리별 합계, 기본 용돈, 전체 잔액을 OpenAI에 전송하는 데 동의합니다. 메모와 개별 거래 내역은 보내지 않습니다.</span>
-                </label>
-                <button id="btn-ai-analyze" class="w-full bg-blue-500 text-white font-bold py-3 rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">이번 달 AI 분석하기</button>
-                <p id="ai-status" class="text-xs text-gray-500" role="status" aria-live="polite"></p>
-                <div id="ai-answer" class="hidden bg-blue-50 p-4 rounded-xl text-sm leading-relaxed whitespace-pre-wrap break-words" aria-live="polite"></div>
-                <p class="text-xs text-gray-400">AI 조언에는 오류가 있을 수 있어요. 거래 내역과 함께 확인해주세요.</p>
+            <div class="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+                <div class="p-5 bg-blue-50 border-b border-blue-100 flex justify-between items-center gap-3">
+                    <div class="flex items-center gap-3"><span class="text-3xl" aria-hidden="true">🐿️</span><div><h3 class="font-extrabold text-lg">돈토리</h3><p class="text-xs text-blue-600">네 편이지만, 충동구매 편은 아님.</p></div></div>
+                    <button id="chat-reset" type="button" class="text-xs text-gray-500 bg-white rounded-lg px-3 py-2">새 대화</button>
+                </div>
+                <div id="chat-messages" class="p-4 space-y-3 overflow-y-auto bg-gray-50" style="height:360px" role="log" aria-label="돈토리와 대화" aria-live="polite"></div>
+                <div class="px-4 py-2 flex flex-wrap gap-2" id="chat-suggestions">
+                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="이번 달 내 소비, 팩폭 좀 해줘">🔥 소비 팩폭</button>
+                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="지금 사고 싶은 게 있는데 참는 법 알려줘">🛒 살까 말까?</button>
+                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="내 잔액으로 월말까지 버틸 계획 짜줘">💸 월말 생존법</button>
+                </div>
+                <div class="p-4 pt-2 space-y-2">
+                    <label class="flex items-start gap-2 text-xs text-gray-500 leading-relaxed"><input id="ai-consent" type="checkbox" class="mt-1"><span>대화 내용과 소비 집계(카테고리·수입·지출·잔액·기본 용돈)를 OpenAI에 전송하는 데 동의해. 개별 거래와 메모는 보내지 않아.</span></label>
+                    <form id="chat-form" class="flex items-end gap-2">
+                        <label for="chat-input" class="sr-only">돈토리에게 질문하기</label>
+                        <textarea id="chat-input" maxlength="1000" rows="2" placeholder="돈토리야, 나 이거 사도 될까?" class="min-w-0 flex-1 resize-none border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"></textarea>
+                        <button id="chat-send" type="submit" class="bg-blue-500 text-white rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50">전송</button>
+                    </form>
+                    <p id="chat-status" class="text-xs text-gray-500" role="status" aria-live="polite"></p>
+                    <button id="chat-retry" type="button" class="hidden text-xs text-blue-600 underline">다시 보내기</button>
+                    <p class="text-xs text-gray-400">돈토리는 AI라 틀릴 수 있어. 최근 6번의 문답을 참고하며, 새로고침하면 대화가 사라져. 개인정보는 적지 마!</p>
+                </div>
             </div>
-            
+
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-bold text-lg">나의 소비 점수</h3>
@@ -740,9 +751,8 @@
 
         // ================= AI 소비 분석 =================
         let aiBusy = false;
-        let aiLastRequestAt = 0;
-        let aiCachedKey = '';
-        let aiCachedAnswer = '';
+        let chatHistory = [];
+        let chatFailed = false;
 
         function buildAISummary() {
             const now = new Date();
@@ -765,61 +775,88 @@
                 categories: Object.entries(sums).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount) };
         }
 
-        document.getElementById('btn-ai-analyze').addEventListener('click', async () => {
+        function renderChat() {
+            const list = document.getElementById('chat-messages');
+            list.replaceChildren();
+            const items = [{ role: 'assistant', content: '안녕, 난 돈토리 🐿️ 네 지갑 지키러 왔어. 돈 쓸 땐 주인공인데 잔액 볼 땐 엑스트라 되는 일, 이제 줄여보자. 뭐가 궁금해?' }, ...chatHistory];
+            items.forEach(message => {
+                const row = document.createElement('div');
+                row.className = message.role === 'user' ? 'flex justify-end' : 'flex justify-start';
+                const bubble = document.createElement('div');
+                bubble.className = 'max-w-[90%] rounded-2xl p-3 text-sm leading-relaxed whitespace-pre-wrap break-words ' +
+                    (message.role === 'user' ? 'bg-blue-500 text-white rounded-br-sm' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-sm');
+                bubble.textContent = message.content;
+                row.appendChild(bubble);
+                list.appendChild(row);
+            });
+            list.scrollTop = list.scrollHeight;
+        }
+
+        async function sendChat(retry = false) {
             if (aiBusy) return;
-            const status = document.getElementById('ai-status');
-            const answer = document.getElementById('ai-answer');
+            const status = document.getElementById('chat-status');
+            const input = document.getElementById('chat-input');
+            const retryButton = document.getElementById('chat-retry');
             if (!document.getElementById('ai-consent').checked) {
-                status.textContent = '전송 항목을 확인하고 동의에 체크해주세요.';
+                status.textContent = '전송 항목을 확인하고 동의에 체크해줘!';
                 return;
             }
-            checkAndInjectAllowance();
-            const summary = buildAISummary();
-            if (!summary.count) {
-                answer.classList.add('hidden');
-                status.textContent = '이번 달 수입이나 지출을 먼저 기록해주세요.';
-                return;
+            const text = retry ? chatHistory.at(-1)?.content : input.value.trim();
+            if (!text || text.length > 1000) { status.textContent = '질문은 1~1,000자로 적어줘.'; return; }
+            if (!retry) {
+                // 실패한 질문은 서버 대화에 남기지 않아 역할 순서를 유지합니다.
+                if (chatFailed) chatHistory.pop();
+                chatHistory.push({ role: 'user', content: text });
+                input.value = '';
             }
-            const key = JSON.stringify(summary);
-            if (key === aiCachedKey && aiCachedAnswer) {
-                answer.textContent = aiCachedAnswer;
-                answer.classList.remove('hidden');
-                status.textContent = '같은 내역으로 분석한 결과입니다. 추가 요청 없이 보여드려요.';
-                return;
-            }
-            if (Date.now() - aiLastRequestAt < 60000) {
-                status.textContent = '마지막 요청에서 1분 후 다시 분석할 수 있어요.';
-                return;
-            }
+            chatFailed = false;
+            retryButton.classList.add('hidden');
             aiBusy = true;
-            aiLastRequestAt = Date.now();
-            const button = document.getElementById('btn-ai-analyze');
-            button.disabled = true;
-            button.textContent = '소비 내역 분석 중…';
-            answer.classList.add('hidden');
-            status.textContent = 'AI가 소비 집계를 살펴보고 있어요.';
+            document.getElementById('chat-send').disabled = true;
+            document.getElementById('chat-reset').disabled = true;
+            status.textContent = '돈토리가 지갑 사정 파악 중… 🐿️';
+            renderChat();
             try {
+                checkAndInjectAllowance();
                 const response = await fetch('/api/analyze', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: key, signal: AbortSignal.timeout(35000)
+                    body: JSON.stringify({ summary: buildAISummary(), messages: chatHistory.slice(-13) }),
+                    signal: AbortSignal.timeout(35000)
                 });
                 const data = await response.json().catch(() => ({}));
-                if (!response.ok) throw new Error(data.error || 'AI에 연결하지 못했어요. Vercel 사이트에서 다시 시도해주세요.');
-                if (typeof data.answer !== 'string' || !data.answer.trim()) throw new Error('분석 결과가 비어 있어요. 다시 시도해주세요.');
-                aiCachedKey = key;
-                aiCachedAnswer = data.answer;
-                answer.textContent = data.answer;
-                answer.classList.remove('hidden');
-                status.textContent = '분석 완료 · 오늘까지 입력한 기록 기준이에요.';
+                if (!response.ok) throw new Error(data.error || '연결이 안 됐어. Vercel 사이트에서 다시 보내줘.');
+                if (typeof data.answer !== 'string' || !data.answer.trim() || data.answer.length > 6000) throw new Error('답변을 완성하지 못했어. 다시 보내줘!');
+                chatHistory.push({ role: 'assistant', content: data.answer });
+                renderChat();
+                status.textContent = '오늘까지 기록한 소비 기준이야. 이어서 물어봐!';
             } catch (error) {
-                status.textContent = error.name === 'TimeoutError' || error.name === 'AbortError'
-                    ? '응답이 늦어지고 있어요. 잠시 후 다시 시도해주세요.' : error.message;
+                chatFailed = true;
+                status.textContent = error.name === 'TimeoutError' || error.name === 'AbortError' ? '돈토리 답변이 늦어지고 있어. 다시 보내줘!' : error.message;
+                retryButton.classList.remove('hidden');
             } finally {
                 aiBusy = false;
-                button.disabled = false;
-                button.textContent = '이번 달 AI 분석하기';
+                document.getElementById('chat-send').disabled = false;
+                document.getElementById('chat-reset').disabled = false;
             }
+        }
+        document.getElementById('chat-form').addEventListener('submit', event => { event.preventDefault(); sendChat(); });
+        document.getElementById('chat-input').addEventListener('keydown', event => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); sendChat(); }
         });
+        document.querySelectorAll('.chat-prompt').forEach(button => button.addEventListener('click', () => {
+            document.getElementById('chat-input').value = button.dataset.prompt;
+            document.getElementById('chat-input').focus();
+        }));
+        document.getElementById('chat-retry').addEventListener('click', () => { if (chatFailed) sendChat(true); });
+        document.getElementById('chat-reset').addEventListener('click', () => {
+            if (aiBusy) return;
+            chatHistory = []; chatFailed = false;
+            document.getElementById('chat-status').textContent = '';
+            document.getElementById('chat-input').value = '';
+            document.getElementById('chat-retry').classList.add('hidden');
+            renderChat();
+        });
+        renderChat();
 
         // ================= 분석 탭 =================
         function calculateScore() {
