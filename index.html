@@ -18,6 +18,13 @@
         /* 홈 중앙 버튼 애니메이션 */
         .home-fab { box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39); }
         .home-fab:active { transform: scale(0.95); }
+        [hidden] { display: none !important; }
+        .dontori-launcher { position:fixed; right:max(16px,env(safe-area-inset-right)); bottom:calc(100px + env(safe-area-inset-bottom)); z-index:45; display:flex; align-items:center; gap:8px; padding:13px 17px; border-radius:999px; background:#2563eb; color:white; font-weight:800; box-shadow:0 5px 20px #2563eb55; }
+        .dontori-panel { position:fixed; right:max(12px,env(safe-area-inset-right)); bottom:calc(100px + env(safe-area-inset-bottom)); z-index:50; display:flex; flex-direction:column; width:min(400px,calc(100vw - 24px)); height:min(650px,calc(100dvh - 120px)); background:white; border:1px solid #dbeafe; border-radius:20px; overflow:hidden; box-shadow:0 12px 50px #0f172a33; }
+        .dontori-panel > * { flex-shrink:0; }
+        .dontori-panel #chat-messages { flex-shrink:1; }
+        .dontori-launcher:focus-visible, .dontori-panel button:focus-visible { outline:3px solid #60a5fa; outline-offset:3px; }
+        @media (max-height:650px) { .dontori-panel { bottom:8px; height:calc(100dvh - 16px); } .dontori-panel #chat-suggestions { display:none; } }
     </style>
 </head>
 <body class="text-gray-800 pb-24">
@@ -128,29 +135,6 @@
         <section id="tab-analysis" class="tab-content space-y-6">
             <h2 class="text-2xl font-bold mb-2">소비 분석</h2>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
-                <div class="p-5 bg-blue-50 border-b border-blue-100 flex justify-between items-center gap-3">
-                    <div class="flex items-center gap-3"><span class="text-3xl" aria-hidden="true">🐿️</span><div><h3 class="font-extrabold text-lg">돈토리</h3><p class="text-xs text-blue-600">네 편이지만, 충동구매 편은 아님.</p></div></div>
-                    <button id="chat-reset" type="button" class="text-xs text-gray-500 bg-white rounded-lg px-3 py-2">새 대화</button>
-                </div>
-                <div id="chat-messages" class="p-4 space-y-3 overflow-y-auto bg-gray-50" style="height:360px" role="log" aria-label="돈토리와 대화" aria-live="polite"></div>
-                <div class="px-4 py-2 flex flex-wrap gap-2" id="chat-suggestions">
-                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="이번 달 내 소비, 팩폭 좀 해줘">🔥 소비 팩폭</button>
-                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="지금 사고 싶은 게 있는데 참는 법 알려줘">🛒 살까 말까?</button>
-                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="내 잔액으로 월말까지 버틸 계획 짜줘">💸 월말 생존법</button>
-                </div>
-                <div class="p-4 pt-2 space-y-2">
-                    <label class="flex items-start gap-2 text-xs text-gray-500 leading-relaxed"><input id="ai-consent" type="checkbox" class="mt-1"><span>대화 내용과 소비 집계(카테고리·수입·지출·잔액·기본 용돈)를 OpenAI에 전송하는 데 동의해. 개별 거래와 메모는 보내지 않아.</span></label>
-                    <form id="chat-form" class="flex items-end gap-2">
-                        <label for="chat-input" class="sr-only">돈토리에게 질문하기</label>
-                        <textarea id="chat-input" maxlength="1000" rows="2" placeholder="돈토리야, 나 이거 사도 될까?" class="min-w-0 flex-1 resize-none border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"></textarea>
-                        <button id="chat-send" type="submit" class="bg-blue-500 text-white rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50">전송</button>
-                    </form>
-                    <p id="chat-status" class="text-xs text-gray-500" role="status" aria-live="polite"></p>
-                    <button id="chat-retry" type="button" class="hidden text-xs text-blue-600 underline">다시 보내기</button>
-                    <p class="text-xs text-gray-400">돈토리는 AI라 틀릴 수 있어. 최근 6번의 문답을 참고하며, 새로고침하면 대화가 사라져. 개인정보는 적지 마!</p>
-                </div>
-            </div>
 
             <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 <div class="flex justify-between items-center mb-4">
@@ -313,6 +297,33 @@
             </div>
         </section>
     </main>
+            <section id="dontori-panel" class="dontori-panel" role="dialog" aria-labelledby="dontori-title" hidden>
+                <div class="p-5 bg-blue-50 border-b border-blue-100 flex justify-between items-center gap-3">
+                    <div class="flex items-center gap-3"><span class="text-3xl" aria-hidden="true">🐿️</span><div><h3 id="dontori-title" class="font-extrabold text-lg">돈토리</h3><p class="text-xs text-blue-600">네 편이지만, 충동구매 편은 아님.</p></div></div>
+                    <div class="flex items-center gap-1"><button id="chat-reset" type="button" class="text-xs text-gray-500 bg-white rounded-lg px-3 py-2">새 대화</button><button id="chat-close" type="button" aria-label="돈토리 채팅 닫기" class="text-gray-500 rounded-lg p-2 text-xl">×</button></div>
+                </div>
+                <div id="chat-messages" class="p-4 space-y-3 overflow-y-auto bg-gray-50" style="flex:1; min-height:80px" role="log" aria-label="돈토리와 대화" aria-live="polite"></div>
+                <div class="px-4 py-2 flex flex-wrap gap-2" id="chat-suggestions">
+                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="이번 달 내 소비, 팩폭 좀 해줘">🔥 소비 팩폭</button>
+                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="지금 사고 싶은 게 있는데 참는 법 알려줘">🛒 살까 말까?</button>
+                    <button type="button" class="chat-prompt text-xs bg-blue-50 text-blue-700 px-3 py-2 rounded-full" data-prompt="내 잔액으로 월말까지 버틸 계획 짜줘">💸 월말 생존법</button>
+                </div>
+                <div class="p-4 pt-2 space-y-2">
+                    <label class="flex items-start gap-2 text-xs text-gray-500 leading-relaxed"><input id="ai-consent" type="checkbox" class="mt-1"><span>대화 내용과 소비 집계(카테고리·수입·지출·잔액·기본 용돈)를 OpenAI에 전송하는 데 동의해. 개별 거래와 메모는 보내지 않아.</span></label>
+                    <form id="chat-form" class="flex items-end gap-2">
+                        <label for="chat-input" class="sr-only">돈토리에게 질문하기</label>
+                        <textarea id="chat-input" maxlength="1000" rows="2" placeholder="돈토리야, 나 이거 사도 될까?" class="min-w-0 flex-1 resize-none border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"></textarea>
+                        <button id="chat-send" type="submit" class="bg-blue-500 text-white rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50">전송</button>
+                    </form>
+                    <p id="chat-storage-note" class="text-xs text-orange-600" role="status"></p>
+                    <p id="chat-status" class="text-xs text-gray-500" role="status" aria-live="polite"></p>
+                    <button id="chat-retry" type="button" class="hidden text-xs text-blue-600 underline">다시 보내기</button>
+                    <p class="text-xs text-gray-400">돈토리는 AI라 틀릴 수 있어. 최근 6번의 문답을 참고해. 대화는 이 브라우저에 최근 30번까지 저장돼. 지우려면 새 대화! 개인정보는 적지 마!</p>
+                </div>
+            </section>
+
+    <button id="dontori-launcher" type="button" class="dontori-launcher" aria-controls="dontori-panel" aria-expanded="false" aria-label="돈토리 채팅 열기"><span aria-hidden="true">🐿️</span><span>돈토리</span><span id="dontori-unread" hidden aria-label="새 답변">●</span></button>
+
 
     <!-- 모달 창들 -->
     <div id="modal-transactions" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden flex-col justify-end">
@@ -751,8 +762,29 @@
 
         // ================= AI 소비 분석 =================
         let aiBusy = false;
+        const CHAT_STORAGE_KEY = 'dontori-chat-v1';
         let chatHistory = [];
         let chatFailed = false;
+        let chatStorageAvailable = true;
+        try {
+            const saved = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || 'null');
+            if (saved && Array.isArray(saved.messages) && saved.messages.length <= 61 && saved.messages.every((m, i) =>
+                m && m.role === (i % 2 === 0 ? 'user' : 'assistant') && typeof m.content === 'string' &&
+                m.content.trim() && m.content.length <= (m.role === 'user' ? 1000 : 6000))) {
+                chatHistory = saved.messages;
+                chatFailed = chatHistory.length % 2 === 1;
+            }
+        } catch { chatStorageAvailable = false; }
+
+        function saveChat() {
+            while (chatHistory.length > 60) chatHistory.splice(0, 2);
+            try {
+                localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify({ messages: chatHistory }));
+                chatStorageAvailable = true;
+            } catch { chatStorageAvailable = false; }
+            document.getElementById('chat-storage-note').textContent = '';
+            if (!chatStorageAvailable) document.getElementById('chat-storage-note').textContent = '브라우저 저장 공간을 사용할 수 없어. 지금 대화는 유지되지만 새로고침하면 사라질 수 있어.';
+        }
 
         function buildAISummary() {
             const now = new Date();
@@ -778,7 +810,7 @@
         function renderChat() {
             const list = document.getElementById('chat-messages');
             list.replaceChildren();
-            const items = [{ role: 'assistant', content: '안녕, 난 돈토리 🐿️ 네 지갑 지키러 왔어. 돈 쓸 땐 주인공인데 잔액 볼 땐 엑스트라 되는 일, 이제 줄여보자. 뭐가 궁금해?' }, ...chatHistory];
+            const items = [{ role: 'assistant', content: '안녕, 난 돈토리 🐿️ 네 지갑 담당 현실 체크 요원이야. 장바구니는 풀옵션인데 잔액은 체험판? 일단 얘기해 봐. 네 편은 들어도 충동구매 편은 안 들어 😂' }, ...chatHistory];
             items.forEach(message => {
                 const row = document.createElement('div');
                 row.className = message.role === 'user' ? 'flex justify-end' : 'flex justify-start';
@@ -810,6 +842,7 @@
                 input.value = '';
             }
             chatFailed = false;
+            saveChat();
             retryButton.classList.add('hidden');
             aiBusy = true;
             document.getElementById('chat-send').disabled = true;
@@ -827,10 +860,13 @@
                 if (!response.ok) throw new Error(data.error || '연결이 안 됐어. Vercel 사이트에서 다시 보내줘.');
                 if (typeof data.answer !== 'string' || !data.answer.trim() || data.answer.length > 6000) throw new Error('답변을 완성하지 못했어. 다시 보내줘!');
                 chatHistory.push({ role: 'assistant', content: data.answer });
+                saveChat();
                 renderChat();
+                if (document.getElementById('dontori-panel').hidden) document.getElementById('dontori-unread').hidden = false;
                 status.textContent = '오늘까지 기록한 소비 기준이야. 이어서 물어봐!';
             } catch (error) {
                 chatFailed = true;
+                saveChat();
                 status.textContent = error.name === 'TimeoutError' || error.name === 'AbortError' ? '돈토리 답변이 늦어지고 있어. 다시 보내줘!' : error.message;
                 retryButton.classList.remove('hidden');
             } finally {
@@ -850,12 +886,36 @@
         document.getElementById('chat-retry').addEventListener('click', () => { if (chatFailed) sendChat(true); });
         document.getElementById('chat-reset').addEventListener('click', () => {
             if (aiBusy) return;
+            if (chatHistory.length && !confirm('돈토리와 나눈 대화를 지우고 새로 시작할까?')) return;
             chatHistory = []; chatFailed = false;
+            saveChat();
             document.getElementById('chat-status').textContent = '';
             document.getElementById('chat-input').value = '';
             document.getElementById('chat-retry').classList.add('hidden');
             renderChat();
         });
+        function toggleChat(open) {
+            const panel = document.getElementById('dontori-panel');
+            const launcher = document.getElementById('dontori-launcher');
+            panel.hidden = !open;
+            launcher.hidden = open;
+            launcher.setAttribute('aria-expanded', String(open));
+            if (open) {
+                document.getElementById('dontori-unread').hidden = true;
+                renderChat();
+                document.getElementById('chat-input').focus();
+            } else launcher.focus();
+        }
+        document.getElementById('dontori-launcher').addEventListener('click', () => toggleChat(true));
+        document.getElementById('chat-close').addEventListener('click', () => toggleChat(false));
+        document.getElementById('dontori-panel').addEventListener('keydown', event => {
+            if (event.key === 'Escape') { event.preventDefault(); toggleChat(false); }
+        });
+        if (chatFailed) {
+            document.getElementById('chat-status').textContent = '이전 질문의 답변을 받지 못했어. 다시 보내거나 새 질문을 적어줘!';
+            document.getElementById('chat-retry').classList.remove('hidden');
+        }
+        saveChat();
         renderChat();
 
         // ================= 분석 탭 =================

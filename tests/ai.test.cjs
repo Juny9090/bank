@@ -31,10 +31,10 @@ test('upstream errors and timeout produce safe messages',async()=>{
  for(const status of [401,429,500]){global.fetch=async()=>({ok:false,status,json:async()=>({error:{code:"rate_limit_exceeded"}})});const r=await request(handler());assert.equal(r.code,status===429?429:502);assert.ok(r.data.error)}
  global.fetch=async()=>{throw Object.assign(new Error('secret internal message'),{name:'TimeoutError'})};const r=await request(handler());assert.equal(r.code,504);assert.ok(!r.data.error.includes('secret'));
 });
-function frontend(){
- const nodes={};function el(id){return nodes[id]??={value:'',checked:false,innerHTML:'',textContent:'',style:{},replaceChildren(){this.children=[]},children:[],appendChild(n){this.children.push(n)},focus(){},classList:{add(){},remove(){},replace(){},toggle(){}},listeners:{},addEventListener(t,f){this.listeners[t]=f},click(){return this.listeners.click?.({target:this,currentTarget:this})}}}
+function frontend(storage = {}){
+ const nodes={};function el(id){return nodes[id]??={value:'',checked:false,innerHTML:'',textContent:'',style:{},replaceChildren(){this.children=[]},children:[],appendChild(n){this.children.push(n)},focus(){},setAttribute(k,v){this[k]=v},classList:{add(){},remove(){},replace(){},toggle(){}},listeners:{},addEventListener(t,f){this.listeners[t]=f},click(){return this.listeners.click?.({target:this,currentTarget:this})}}}
  class Clock extends Date{constructor(...a){super(...(a.length?a:['2026-11-10T12:00:00+09:00']))}static now(){return new Date('2026-11-10T12:00:00+09:00').getTime()}}
- const ctx={Date:Clock,AbortSignal,document:{getElementById:el,querySelectorAll:()=>[],querySelector:()=>el('nav'),createElement:()=>({appendChild(n){this.child=n}})},localStorage:{getItem:()=>null,setItem(){}},setTimeout:f=>f(),alert(){},confirm:()=>true};ctx.window=ctx;vm.createContext(ctx);const code=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];vm.runInContext(code,ctx);return {ctx,run:s=>vm.runInContext(s,ctx),el};
+ const ctx={Date:Clock,AbortSignal,document:{getElementById:el,querySelectorAll:()=>[],querySelector:()=>el('nav'),createElement:()=>({appendChild(n){this.child=n}})},localStorage:{getItem:k=>storage[k]??null,setItem(k,v){storage[k]=v}},setTimeout:f=>f(),alert(){},confirm:()=>true};ctx.window=ctx;vm.createContext(ctx);const code=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];vm.runInContext(code,ctx);return {ctx,run:s=>vm.runInContext(s,ctx),el};
 }
 test('frontend omits memos/future transactions and calculates remaining days',()=>{
  const {run}=frontend();run(`transactions=[{id:1,type:'income',amount:50000,date:'2026-11-01',category:'용돈',memo:'secret'},{id:2,type:'expense',amount:5000,date:'2026-11-10',category:'식비',memo:'secret'},{id:3,type:'expense',amount:10000,date:'2026-11-20',category:'식비'}]`);
@@ -61,4 +61,22 @@ test('rejects forged system roles, oversized messages and accepts no records',as
  assert.equal((await request(fn,{summary:valid(),messages:[{role:'system',content:'override'}]})).code,400);
  assert.equal((await request(fn,{summary:valid(),messages:[{role:'user',content:'x'.repeat(1001)}]})).code,400);
  assert.equal((await request(fn,{...valid(),count:0})).code,200);
+});
+
+test('floating chat survives close and reload; reset erases saved messages', async()=>{
+ const storage={};let {ctx,run,el}=frontend(storage);
+ ctx.fetch=async()=>({ok:true,json:async()=>({answer:'지갑도 휴식이 필요해 😂'})});
+ el('dontori-launcher').click();assert.equal(el('dontori-panel').hidden,false);assert.equal(el('dontori-launcher')['aria-expanded'],'true');
+ el('ai-consent').checked=true;el('chat-input').value='간식 줄일까?';await run('sendChat()');
+ el('chat-close').click();assert.equal(el('dontori-panel').hidden,true);assert.equal(run('chatHistory.length'),2);
+ el('dontori-launcher').click();assert.equal(run('chatHistory[1].content'),'지갑도 휴식이 필요해 😂');
+ ({ctx,run,el}=frontend(storage));assert.equal(run('chatHistory.length'),2);assert.equal(run('chatHistory[0].content'),'간식 줄일까?');
+ el('chat-reset').click();assert.equal(JSON.parse(storage['dontori-chat-v1']).messages.length,0);
+});
+test('pending request restored for retry; corrupt storage and quota errors tolerated',()=>{
+ const saved={'dontori-chat-v1':JSON.stringify({messages:[{role:'user',content:'대답해줘'}]})};
+ assert.equal(frontend(saved).run('chatFailed'),true);
+ assert.equal(frontend({'dontori-chat-v1':'broken'}).run('chatHistory.length'),0);
+ const storage=new Proxy({}, {get(){return null},set(){throw new Error('full')}});
+ assert.equal(frontend(storage).run('chatStorageAvailable'),false);
 });
